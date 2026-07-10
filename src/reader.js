@@ -23,10 +23,12 @@ let lastSaveTime = 0;
 let moyuCharsPerPage = 40;
 let moyuPageContent = [];
 let moyuCurrentPage = 0;
+// 摸鱼模式拼接全文（预计算，避免重复拼接）
+let moyuFullText = '';
 
 // 章节列表
 let chapters = [];          // [{ title, lineIndex }]
-let moyuLineOffsets = [];   // moyuLineOffsets[i] = bookLines[i] 在摸鱼 fullText 中的字符偏移
+let moyuLineOffsets = [];   // moyuLineOffsets[i] = bookLines[i] 在 moyuFullText 中的字符偏移
 
 // 章节匹配正则（参考 dooshu README 正则规则）
 // 匹配：第N章/节/回/卷/部/篇（中文数字或阿拉伯数字）
@@ -107,9 +109,11 @@ async function init() {
   // 按行分割
   bookLines = bookContent.split('\n').filter(line => line.trim() !== '');
 
-  // 解析章节 & 预计算摸鱼模式行偏移
+  // 预计算摸鱼模式拼接全文和行偏移
+  computeMoyuFullText();
+
+  // 解析章节
   parseChapters();
-  computeMoyuLineOffsets();
   renderChapterList();
 
   // 获取书名
@@ -127,10 +131,13 @@ async function init() {
   document.getElementById('bookInfo').textContent = `${bookTitle}${bookAuthor ? ' · ' + bookAuthor : ''}`;
   document.title = bookTitle;
 
-  // 加载进度
+  // 加载进度（统一使用行索引作为位置参照）
+  let savedLineIndex = 0;
   const progress = await window.api.getProgress(CATEGORY, BOOKID);
   if (progress && progress.page !== undefined) {
-    currentPage = progress.page;
+    savedLineIndex = progress.page;
+  } else {
+    savedLineIndex = START_PAGE;
   }
 
   // 加载书签
@@ -139,24 +146,76 @@ async function init() {
 
   // 加载阅读时长
   const savedTime = await window.api.getReadingTime(CATEGORY, BOOKID);
-  readingTimeSeconds = 0; // 本次会话从0开始，总时长在底部显示
+  readingTimeSeconds = 0;
   updateReadingTimeDisplay(savedTime || 0);
 
   // 加载主题
   currentTheme = await window.api.getTheme();
   applyTheme(currentTheme);
 
-  // 计算分页
-  calculatePages();
+  // 计算分页（摸鱼模式需要延迟等布局完成）
+  if (MODE === 'moyu') {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        calculatePages();
+        goToLineIndex(savedLineIndex);
+        startReadingTimer();
+        bindEvents();
+      });
+    });
+  } else {
+    calculatePages();
+    goToLineIndex(savedLineIndex);
+    startReadingTimer();
+    bindEvents();
+  }
+}
 
-  // 渲染内容
-  renderPage();
+// ===== 通用位置参照（行索引）=====
+// 所有模式共用行索引作为位置参照，确保模式切换时位置一致
 
-  // 开始计时
-  startReadingTimer();
+function getCurrentLineIndex() {
+  if (MODE === 'moyu') {
+    const charStart = moyuCurrentPage * moyuCharsPerPage;
+    return getMoyuLineForCharOffset(charStart);
+  } else {
+    return currentPage * linesPerPage;
+  }
+}
 
-  // 绑定事件
-  bindEvents();
+function goToLineIndex(lineIndex) {
+  if (lineIndex < 0) lineIndex = 0;
+  if (lineIndex >= bookLines.length) lineIndex = bookLines.length - 1;
+
+  if (MODE === 'moyu') {
+    const charOffset = moyuLineOffsets[lineIndex] || 0;
+    moyuCurrentPage = Math.floor(charOffset / moyuCharsPerPage);
+    if (moyuCurrentPage >= totalPages) moyuCurrentPage = totalPages - 1;
+    if (moyuCurrentPage < 0) moyuCurrentPage = 0;
+    currentPage = moyuCurrentPage;
+    renderMoyuPage();
+  } else {
+    currentPage = Math.floor(lineIndex / linesPerPage);
+    if (currentPage >= totalPages) currentPage = totalPages - 1;
+    if (currentPage < 0) currentPage = 0;
+    renderReaderPage();
+    scrollToTop();
+  }
+  updateProgress();
+  highlightCurrentChapter();
+}
+
+// ===== 预计算摸鱼全文 =====
+function computeMoyuFullText() {
+  const cleanedLines = bookLines.map(line => line.replace(/\s+/g, ' ').trim());
+  moyuFullText = cleanedLines.join(' ');
+
+  moyuLineOffsets = [];
+  let offset = 0;
+  for (let i = 0; i < bookLines.length; i++) {
+    moyuLineOffsets[i] = offset;
+    offset += cleanedLines[i].length + 1;
+  }
 }
 
 // ===== 分页计算 =====
@@ -165,22 +224,27 @@ function calculateMoyuCharsPerPage() {
   if (!moyuText) return 40;
 
   const containerWidth = moyuText.clientWidth;
-  if (containerWidth <= 0) return 40;
+  if (containerWidth <= 0) {
+    const fallback = window.innerWidth - 80;
+    if (fallback > 20) {
+      return Math.max(10, Math.floor(fallback / 14));
+    }
+    return 40;
+  }
 
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   const style = getComputedStyle(moyuText);
-  const fontSize = style.fontSize || '13px';
-  const fontFamily = style.fontFamily || '"Microsoft YaHei", sans-serif';
-  ctx.font = `${fontSize} ${fontFamily}`;
+  const fs = style.fontSize || '13px';
+  const ff = style.fontFamily || '"Microsoft YaHei", sans-serif';
+  ctx.font = `${fs} ${ff}`;
 
-  const fullText = bookLines.join(' ').replace(/\s+/g, ' ').trim();
   let width = 0;
   let count = 0;
-  const maxWidth = containerWidth - 6;
+  const maxWidth = containerWidth - 12;
 
-  while (count < fullText.length && width < maxWidth) {
-    width += ctx.measureText(fullText[count]).width;
+  while (count < moyuFullText.length && width < maxWidth) {
+    width += ctx.measureText(moyuFullText[count]).width;
     if (width < maxWidth) count++;
   }
 
@@ -189,21 +253,18 @@ function calculateMoyuCharsPerPage() {
 
 function calculatePages() {
   if (MODE === 'moyu') {
-    // 摸鱼模式：动态测量可见宽度后按字符精确分页
     moyuCharsPerPage = calculateMoyuCharsPerPage();
-    const fullText = bookLines.join(' ').replace(/\s+/g, ' ').trim();
     moyuPageContent = [];
-    for (let i = 0; i < fullText.length; i += moyuCharsPerPage) {
-      moyuPageContent.push(fullText.substring(i, i + moyuCharsPerPage));
+    for (let i = 0; i < moyuFullText.length; i += moyuCharsPerPage) {
+      moyuPageContent.push(moyuFullText.substring(i, i + moyuCharsPerPage));
     }
     totalPages = moyuPageContent.length;
-    if (currentPage >= totalPages) currentPage = totalPages - 1;
-    if (currentPage < 0) currentPage = 0;
-    moyuCurrentPage = currentPage;
+    if (totalPages === 0) totalPages = 1;
+    if (moyuCurrentPage >= totalPages) moyuCurrentPage = totalPages - 1;
+    if (moyuCurrentPage < 0) moyuCurrentPage = 0;
+    currentPage = moyuCurrentPage;
   } else {
-    // 窗口/全屏模式：按行分页
     totalPages = Math.ceil(bookLines.length / linesPerPage);
-    // 第一行是书名，从第二行开始阅读
     if (currentPage >= totalPages) currentPage = totalPages - 1;
     if (currentPage < 0) currentPage = 0;
   }
@@ -230,7 +291,6 @@ function renderReaderPage() {
   readerText.style.fontSize = fontSize + 'px';
   readerText.textContent = lines.join('\n');
 
-  // 更新页码
   document.getElementById('pageInfo').textContent = `${currentPage + 1} / ${totalPages}`;
 }
 
@@ -253,6 +313,7 @@ function nextPage() {
       currentPage = moyuCurrentPage;
       renderMoyuPage();
       updateProgress();
+      highlightCurrentChapter();
       saveProgressDebounced();
     }
   } else {
@@ -260,6 +321,9 @@ function nextPage() {
       currentPage++;
       renderReaderPage();
       scrollToTop();
+      updateProgress();
+      highlightCurrentChapter();
+      saveProgressDebounced();
     }
   }
 }
@@ -271,6 +335,7 @@ function prevPage() {
       currentPage = moyuCurrentPage;
       renderMoyuPage();
       updateProgress();
+      highlightCurrentChapter();
       saveProgressDebounced();
     }
   } else {
@@ -278,6 +343,9 @@ function prevPage() {
       currentPage--;
       renderReaderPage();
       scrollToTop();
+      updateProgress();
+      highlightCurrentChapter();
+      saveProgressDebounced();
     }
   }
 }
@@ -298,18 +366,6 @@ function parseChapters() {
   }
 }
 
-// 预计算每行在摸鱼模式 fullText 中的字符偏移
-function computeMoyuLineOffsets() {
-  moyuLineOffsets = [];
-  let offset = 0;
-  for (let i = 0; i < bookLines.length; i++) {
-    moyuLineOffsets[i] = offset;
-    const cleaned = bookLines[i].replace(/\s+/g, ' ').trim();
-    offset += cleaned.length + 1; // +1 for joining space
-  }
-}
-
-// 渲染章节列表面板
 function renderChapterList() {
   const list = document.getElementById('chapterList');
   if (!list) return;
@@ -329,7 +385,6 @@ function renderChapterList() {
   });
 }
 
-// 高亮当前章节
 function highlightCurrentChapter() {
   const current = getCurrentChapterIndex();
   document.querySelectorAll('.chapter-item').forEach((item, i) => {
@@ -337,23 +392,15 @@ function highlightCurrentChapter() {
   });
 }
 
-// 获取当前所在章节索引
 function getCurrentChapterIndex() {
   if (chapters.length === 0) return -1;
-  let currentLine;
-  if (MODE === 'moyu') {
-    const charStart = moyuCurrentPage * moyuCharsPerPage;
-    currentLine = getMoyuLineForCharOffset(charStart);
-  } else {
-    currentLine = currentPage * linesPerPage;
-  }
+  const currentLine = getCurrentLineIndex();
   for (let i = chapters.length - 1; i >= 0; i--) {
     if (chapters[i].lineIndex <= currentLine) return i;
   }
   return -1;
 }
 
-// 二分查找：字符偏移对应的行索引
 function getMoyuLineForCharOffset(charOffset) {
   if (moyuLineOffsets.length === 0) return 0;
   let lo = 0, hi = moyuLineOffsets.length - 1;
@@ -368,32 +415,13 @@ function getMoyuLineForCharOffset(charOffset) {
   return lo;
 }
 
-// 跳转到指定章节
 function jumpToChapter(chapterIndex) {
   if (chapterIndex < 0 || chapterIndex >= chapters.length) return;
   const ch = chapters[chapterIndex];
-
-  if (MODE === 'moyu') {
-    const charOffset = moyuLineOffsets[ch.lineIndex] || 0;
-    moyuCurrentPage = Math.floor(charOffset / moyuCharsPerPage);
-    if (moyuCurrentPage >= totalPages) moyuCurrentPage = totalPages - 1;
-    if (moyuCurrentPage < 0) moyuCurrentPage = 0;
-    currentPage = moyuCurrentPage;
-    renderMoyuPage();
-    updateProgress();
-    saveProgressDebounced();
-  } else {
-    currentPage = Math.floor(ch.lineIndex / linesPerPage);
-    renderReaderPage();
-    scrollToTop();
-    updateProgress();
-    saveProgressDebounced();
-  }
-  highlightCurrentChapter();
+  goToLineIndex(ch.lineIndex);
   showToast('跳转到: ' + ch.title);
 }
 
-// 上一章
 function prevChapter() {
   if (chapters.length === 0) {
     showToast('未检测到章节');
@@ -407,7 +435,6 @@ function prevChapter() {
   }
 }
 
-// 下一章
 function nextChapter() {
   if (chapters.length === 0) {
     showToast('未检测到章节');
@@ -424,8 +451,10 @@ function nextChapter() {
 // ===== 进度更新 =====
 function updateProgress() {
   const progress = totalPages > 0 ? ((currentPage + 1) / totalPages * 100) : 0;
-  document.getElementById('progressFill').style.width = progress + '%';
-  document.getElementById('progressText').textContent = Math.round(progress) + '%';
+  const fillEl = document.getElementById('progressFill');
+  const textEl = document.getElementById('progressText');
+  if (fillEl) fillEl.style.width = progress + '%';
+  if (textEl) textEl.textContent = Math.round(progress) + '%';
 }
 
 // ===== 阅读时长 =====
@@ -434,7 +463,6 @@ function startReadingTimer() {
   readingTimer = setInterval(() => {
     readingTimeSeconds++;
     updateReadingTimeDisplay();
-    // 每30秒保存一次
     if (readingTimeSeconds % 30 === 0) {
       window.api.saveReadingTime(CATEGORY, BOOKID, 30);
     }
@@ -442,7 +470,6 @@ function startReadingTimer() {
 }
 
 function updateReadingTimeDisplay(totalTime) {
-  const time = totalTime !== undefined ? totalTime : readingTimeSeconds;
   const displayTime = totalTime !== undefined ? totalTime : readingTimeSeconds;
   const hours = Math.floor(displayTime / 3600);
   const mins = Math.floor((displayTime % 3600) / 60);
@@ -451,29 +478,38 @@ function updateReadingTimeDisplay(totalTime) {
   if (hours > 0) timeStr = `${hours}小时${mins}分钟`;
   else if (mins > 0) timeStr = `${mins}分${secs}秒`;
   else timeStr = `${secs}秒`;
-  document.getElementById('readingTime').textContent = `阅读时长: ${timeStr}`;
+  const el = document.getElementById('readingTime');
+  if (el) el.textContent = `阅读时长: ${timeStr}`;
 }
 
-// ===== 保存进度（防抖） =====
+// ===== 保存进度（防抖）=====
+// 统一保存行索引，确保所有模式间位置一致
 let saveProgressTimer = null;
 function saveProgressDebounced() {
   if (saveProgressTimer) clearTimeout(saveProgressTimer);
   saveProgressTimer = setTimeout(() => {
-    window.api.saveProgress(CATEGORY, BOOKID, currentPage, 0);
+    const lineIndex = getCurrentLineIndex();
+    window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0);
   }, 500);
 }
 
 // ===== 书签管理 =====
 async function saveBookmark() {
-  const page = MODE === 'moyu' ? moyuCurrentPage : currentPage;
-  await window.api.saveBookmark(CATEGORY, BOOKID, page, `第${page + 1}页`);
+  const lineIndex = getCurrentLineIndex();
+  let label = `第${lineIndex + 1}行`;
+  const chIdx = getCurrentChapterIndex();
+  if (chIdx >= 0) {
+    label = chapters[chIdx].title;
+  }
+  await window.api.saveBookmark(CATEGORY, BOOKID, lineIndex, label);
   bookmarks = await window.api.getBookmarks(CATEGORY, BOOKID);
   renderBookmarks();
-  showToast('书签已保存');
+  showToast('书签已保存: ' + label);
 }
 
 function renderBookmarks() {
   const list = document.getElementById('bookmarkList');
+  if (!list) return;
   if (bookmarks.length === 0) {
     list.innerHTML = '<div class="bookmark-empty">暂无书签</div>';
     return;
@@ -493,27 +529,16 @@ function renderBookmarks() {
     `;
   }).join('');
 
-  // 绑定点击跳转
   list.querySelectorAll('.bookmark-item').forEach(item => {
     item.addEventListener('click', (e) => {
       if (e.target.classList.contains('bookmark-item-delete')) return;
       const idx = parseInt(item.dataset.index);
       const bm = bookmarks[idx];
-      if (MODE === 'moyu') {
-        moyuCurrentPage = bm.page;
-        currentPage = bm.page;
-        renderMoyuPage();
-        updateProgress();
-      } else {
-        currentPage = bm.page;
-        renderReaderPage();
-        scrollToTop();
-        updateProgress();
-      }
+      goToLineIndex(bm.page);
+      showToast('跳转到书签: ' + bm.label);
     });
   });
 
-  // 删除书签
   list.querySelectorAll('.bookmark-item-delete').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -526,16 +551,14 @@ function renderBookmarks() {
 }
 
 // ===== 模式切换 =====
+// 切换时传递行索引而非页码，确保位置一致
 async function switchMode(newMode) {
-  const page = MODE === 'moyu' ? moyuCurrentPage : currentPage;
-  // 保存当前进度
-  await window.api.saveProgress(CATEGORY, BOOKID, page, 0);
-  // 保存阅读时长
+  const lineIndex = getCurrentLineIndex();
+  await window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0);
   if (readingTimeSeconds > 0) {
     await window.api.saveReadingTime(CATEGORY, BOOKID, readingTimeSeconds);
   }
-  // 切换模式（当前窗口会被关闭，新窗口会被创建，所以不需要await结果）
-  window.api.switchMode(newMode, CATEGORY, BOOKID, page).catch(() => {});
+  window.api.switchMode(newMode, CATEGORY, BOOKID, lineIndex).catch(() => {});
 }
 
 // ===== 右键菜单 =====
@@ -569,6 +592,8 @@ function showToast(message) {
       z-index: 10000;
       transition: opacity 0.3s;
       pointer-events: none;
+      max-width: 80%;
+      text-align: center;
     `;
     document.body.appendChild(toast);
   }
@@ -581,11 +606,9 @@ function showToast(message) {
 
 // ===== 事件绑定 =====
 function bindEvents() {
-  // 上一页/下一页按钮
   document.getElementById('prevPageBtn').addEventListener('click', prevPage);
   document.getElementById('nextPageBtn').addEventListener('click', nextPage);
 
-  // 字体大小
   document.getElementById('fontDecreaseBtn').addEventListener('click', () => {
     if (fontSize > 12) {
       fontSize -= 2;
@@ -599,7 +622,6 @@ function bindEvents() {
     }
   });
 
-  // 书签
   document.getElementById('bookmarkBtn').addEventListener('click', saveBookmark);
   document.getElementById('bookmarkListBtn').addEventListener('click', () => {
     document.getElementById('bookmarkPanel').classList.toggle('show');
@@ -608,7 +630,6 @@ function bindEvents() {
     document.getElementById('bookmarkPanel').classList.remove('show');
   });
 
-  // 章节列表
   document.getElementById('chapterListBtn').addEventListener('click', () => {
     document.getElementById('chapterPanel').classList.toggle('show');
   });
@@ -616,7 +637,6 @@ function bindEvents() {
     document.getElementById('chapterPanel').classList.remove('show');
   });
 
-  // 主题设置面板
   document.getElementById('settingsBtn').addEventListener('click', () => {
     document.getElementById('settingsPanel').classList.toggle('show');
   });
@@ -624,7 +644,6 @@ function bindEvents() {
     document.getElementById('settingsPanel').classList.remove('show');
   });
 
-  // 预设主题按钮
   document.querySelectorAll('.preset-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const preset = btn.dataset.preset;
@@ -641,7 +660,6 @@ function bindEvents() {
     });
   });
 
-  // 跟随系统深色模式
   document.getElementById('followSystemCheck').addEventListener('change', async (e) => {
     const followSystem = e.target.checked;
     const theme = { ...currentTheme, followSystem };
@@ -650,7 +668,6 @@ function bindEvents() {
     await window.api.saveTheme(theme);
   });
 
-  // 背景色 - color input
   document.getElementById('bgColorInput').addEventListener('input', (e) => {
     const color = e.target.value;
     document.getElementById('bgColorText').value = color;
@@ -660,7 +677,6 @@ function bindEvents() {
     saveThemeDebounced(theme);
   });
 
-  // 背景色 - text input
   document.getElementById('bgColorText').addEventListener('change', (e) => {
     let color = e.target.value.trim();
     if (!color.startsWith('#')) color = '#' + color;
@@ -675,7 +691,6 @@ function bindEvents() {
     }
   });
 
-  // 文字色 - color input
   document.getElementById('textColorInput').addEventListener('input', (e) => {
     const color = e.target.value;
     document.getElementById('textColorText').value = color;
@@ -685,7 +700,6 @@ function bindEvents() {
     saveThemeDebounced(theme);
   });
 
-  // 文字色 - text input
   document.getElementById('textColorText').addEventListener('change', (e) => {
     let color = e.target.value.trim();
     if (!color.startsWith('#')) color = '#' + color;
@@ -700,14 +714,12 @@ function bindEvents() {
     }
   });
 
-  // 屏幕取色按钮
   document.querySelectorAll('.screen-pick-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       startScreenPick(btn.dataset.target);
     });
   });
 
-  // 字体大小滑块
   document.getElementById('fontSizeSlider').addEventListener('input', (e) => {
     const size = parseInt(e.target.value);
     document.getElementById('fontSizeValue').textContent = size;
@@ -717,13 +729,11 @@ function bindEvents() {
     saveThemeDebounced(theme);
   });
 
-  // 主题更新事件（其他窗口修改主题时同步）
   window.api.onThemeUpdated((theme) => {
     currentTheme = theme;
     applyTheme(theme);
   });
 
-  // 系统原生主题变化
   window.api.onNativeThemeChanged((isDark) => {
     if (currentTheme && currentTheme.followSystem) {
       const preset = isDark ? 'dark' : 'light';
@@ -739,27 +749,22 @@ function bindEvents() {
     }
   });
 
-  // 模式切换按钮
   document.querySelectorAll('.mode-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       switchMode(btn.dataset.mode);
     });
   });
 
-  // 返回按钮（关闭窗口）
   document.getElementById('backBtn').addEventListener('click', async () => {
-    // 保存进度和时长
-    const page = MODE === 'moyu' ? moyuCurrentPage : currentPage;
-    await window.api.saveProgress(CATEGORY, BOOKID, page, 0);
+    const lineIndex = getCurrentLineIndex();
+    await window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0);
     if (readingTimeSeconds > 0) {
       await window.api.saveReadingTime(CATEGORY, BOOKID, readingTimeSeconds);
     }
     window.api.closeReader().catch(() => {});
   });
 
-  // 右键菜单
   if (MODE === 'moyu') {
-    // 摸鱼模式：使用原生右键菜单（HTML菜单会被窄窗口裁剪）
     document.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       window.api.showMoyuMenu((action) => {
@@ -767,13 +772,11 @@ function bindEvents() {
       });
     });
   } else {
-    // 窗口/全屏模式：使用 HTML 右键菜单
     document.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       showContextMenu(e.clientX, e.clientY);
     });
 
-    // 右键菜单项点击
     document.querySelectorAll('.context-menu-item').forEach(item => {
       item.addEventListener('click', () => {
         const action = item.dataset.action;
@@ -782,25 +785,33 @@ function bindEvents() {
       });
     });
 
-    // 点击其他地方关闭右键菜单
     document.addEventListener('click', () => {
       hideContextMenu();
     });
   }
 
-  // 键盘快捷键
   document.addEventListener('keydown', handleKeyDown);
 
-  // 摸鱼模式：拖动
   if (MODE === 'moyu') {
     setupMoyuDrag();
   }
 
-  // 窗口关闭前保存
+  // 摸鱼模式：窗口大小变化时重新计算分页
+  if (MODE === 'moyu') {
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const savedLine = getCurrentLineIndex();
+        calculatePages();
+        goToLineIndex(savedLine);
+      }, 200);
+    });
+  }
+
   window.addEventListener('beforeunload', () => {
-    const page = MODE === 'moyu' ? moyuCurrentPage : currentPage;
-    // 同步发送保存请求
-    window.api.saveProgress(CATEGORY, BOOKID, page, 0);
+    const lineIndex = getCurrentLineIndex();
+    window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0);
     if (readingTimeSeconds > 0) {
       window.api.saveReadingTime(CATEGORY, BOOKID, readingTimeSeconds);
     }
@@ -866,7 +877,6 @@ function handleContextAction(action) {
       break;
     case 'bookmarkList':
       if (MODE === 'moyu') {
-        // 摸鱼窗口太窄无法显示书签面板，切换到窗口模式查看
         switchMode('window');
       } else {
         document.getElementById('bookmarkPanel').classList.toggle('show');
@@ -913,7 +923,6 @@ function setupMoyuDrag() {
   let startX = 0, startY = 0;
 
   container.addEventListener('mousedown', (e) => {
-    // 右键不启动拖动
     if (e.button === 2) return;
     isDragging = true;
     startX = e.screenX;
@@ -963,7 +972,12 @@ function applyTheme(theme) {
 
   updateSettingsPanel(theme);
 
-  if (bookLines.length > 0) {
+  // 主题变化后，摸鱼模式需要重新计算分页
+  if (MODE === 'moyu' && bookLines.length > 0 && moyuFullText) {
+    const savedLine = getCurrentLineIndex();
+    calculatePages();
+    goToLineIndex(savedLine);
+  } else if (bookLines.length > 0) {
     renderPage();
   }
 }

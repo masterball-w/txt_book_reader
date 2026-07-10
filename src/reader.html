@@ -25,6 +25,7 @@
         <div class="toolbar-divider"></div>
         <button class="toolbar-btn" id="bookmarkBtn" title="保存书签 (Ctrl+B)">🔖</button>
         <button class="toolbar-btn" id="bookmarkListBtn" title="书签列表">📋</button>
+        <button class="toolbar-btn" id="chapterListBtn" title="章节目录 ( [ / ] )">📑</button>
         <div class="toolbar-divider"></div>
         <button class="toolbar-btn" id="settingsBtn" title="主题设置">⚙️</button>
         <button class="toolbar-btn mode-btn" data-mode="window" title="窗口模式">🪟</button>
@@ -62,6 +63,17 @@
       </div>
       <div class="bookmark-list" id="bookmarkList">
         <div class="bookmark-empty">暂无书签</div>
+      </div>
+    </div>
+
+    <!-- 章节列表面板 -->
+    <div class="chapter-panel" id="chapterPanel">
+      <div class="chapter-panel-header">
+        <span>章节目录</span>
+        <button class="close-btn" id="closeChapterPanel">✕</button>
+      </div>
+      <div class="chapter-list" id="chapterList">
+        <div class="chapter-empty">未检测到章节</div>
       </div>
     </div>
 
@@ -131,6 +143,10 @@
     <div class="context-menu-divider"></div>
     <div class="context-menu-item" data-action="prev">◀ 上一页</div>
     <div class="context-menu-item" data-action="next">▶ 下一页</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="prevChapter">⏮ 上一章 ([)</div>
+    <div class="context-menu-item" data-action="nextChapter">⏭ 下一章 (])</div>
+    <div class="context-menu-item" data-action="chapterList">📑 章节目录</div>
     <div class="context-menu-divider" id="moyuHideDivider"></div>
     <div class="context-menu-item" data-action="hide" id="moyuHideItem">🙈 隐藏 (Ctrl+`)</div>
   </div>

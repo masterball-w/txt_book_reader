@@ -18,8 +18,8 @@ if (!gotTheLock) {
   });
 }
 
-// 书库根目录（shu 子模块目录）
-const BOOKS_ROOT = path.join(__dirname, 'shu');
+// 书库根目录（上级目录）
+const BOOKS_ROOT = path.join(__dirname, '..');
 // 用户数据目录（延迟初始化）
 let USER_DATA_DIR = null;
 let DATA_FILE = null;
@@ -578,12 +578,16 @@ ipcMain.on('moyu-context-menu', (event) => {
   const menu = Menu.buildFromTemplate([
     { label: '🔖 保存书签', click: () => sendMoyuAction(event, 'bookmark') },
     { label: '📋 书签列表', click: () => sendMoyuAction(event, 'bookmarkList') },
+    { label: '📑 章节目录', click: () => sendMoyuAction(event, 'chapterList') },
     { type: 'separator' },
     { label: '🪟 切换到窗口模式', click: () => sendMoyuAction(event, 'mode-window') },
     { label: '🖥️ 切换到全屏模式', click: () => sendMoyuAction(event, 'mode-fullscreen') },
     { type: 'separator' },
     { label: '◀ 上一页', click: () => sendMoyuAction(event, 'prev') },
     { label: '▶ 下一页', click: () => sendMoyuAction(event, 'next') },
+    { type: 'separator' },
+    { label: '⏮ 上一章', click: () => sendMoyuAction(event, 'prevChapter') },
+    { label: '⏭ 下一章', click: () => sendMoyuAction(event, 'nextChapter') },
     { type: 'separator' },
     { label: '🙈 隐藏 (Ctrl+`)', click: () => sendMoyuAction(event, 'hide') },
   ]);

@@ -24,6 +24,15 @@ let moyuCharsPerPage = 40;
 let moyuPageContent = [];
 let moyuCurrentPage = 0;
 
+// 章节列表
+let chapters = [];          // [{ title, lineIndex }]
+let moyuLineOffsets = [];   // moyuLineOffsets[i] = bookLines[i] 在摸鱼 fullText 中的字符偏移
+
+// 章节匹配正则（参考 dooshu README 正则规则）
+// 匹配：第N章/节/回/卷/部/篇（中文数字或阿拉伯数字）
+// 匹配：Chapter N（英文）
+const CHAPTER_REGEX = /^第[\d一二三四五六七八九十百千万零两壹贰叁肆伍陆柒捌玖拾佰仟]+[章节回卷部篇]\s*.*|^Chapter\s+[\dIVXLCDMivxlcdm]+.*/i;
+
 // 主题预设
 const THEME_PRESETS = {
   dark: {
@@ -97,6 +106,11 @@ async function init() {
 
   // 按行分割
   bookLines = bookContent.split('\n').filter(line => line.trim() !== '');
+
+  // 解析章节 & 预计算摸鱼模式行偏移
+  parseChapters();
+  computeMoyuLineOffsets();
+  renderChapterList();
 
   // 获取书名
   const titleLine = bookLines[0] || '未知书名';
@@ -203,6 +217,7 @@ function renderPage() {
     renderReaderPage();
   }
   updateProgress();
+  highlightCurrentChapter();
   saveProgressDebounced();
 }
 
@@ -270,6 +285,140 @@ function prevPage() {
 function scrollToTop() {
   const content = document.getElementById('readerContent');
   content.scrollTop = 0;
+}
+
+// ===== 章节解析 =====
+function parseChapters() {
+  chapters = [];
+  for (let i = 0; i < bookLines.length; i++) {
+    const line = bookLines[i].trim();
+    if (CHAPTER_REGEX.test(line) && line.length <= 100) {
+      chapters.push({ title: line, lineIndex: i });
+    }
+  }
+}
+
+// 预计算每行在摸鱼模式 fullText 中的字符偏移
+function computeMoyuLineOffsets() {
+  moyuLineOffsets = [];
+  let offset = 0;
+  for (let i = 0; i < bookLines.length; i++) {
+    moyuLineOffsets[i] = offset;
+    const cleaned = bookLines[i].replace(/\s+/g, ' ').trim();
+    offset += cleaned.length + 1; // +1 for joining space
+  }
+}
+
+// 渲染章节列表面板
+function renderChapterList() {
+  const list = document.getElementById('chapterList');
+  if (!list) return;
+  if (chapters.length === 0) {
+    list.innerHTML = '<div class="chapter-empty">未检测到章节</div>';
+    return;
+  }
+  list.innerHTML = chapters.map((ch, i) =>
+    `<div class="chapter-item" data-index="${i}">${escapeHtml(ch.title)}</div>`
+  ).join('');
+
+  list.querySelectorAll('.chapter-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const idx = parseInt(item.dataset.index);
+      jumpToChapter(idx);
+    });
+  });
+}
+
+// 高亮当前章节
+function highlightCurrentChapter() {
+  const current = getCurrentChapterIndex();
+  document.querySelectorAll('.chapter-item').forEach((item, i) => {
+    item.classList.toggle('active', i === current);
+  });
+}
+
+// 获取当前所在章节索引
+function getCurrentChapterIndex() {
+  if (chapters.length === 0) return -1;
+  let currentLine;
+  if (MODE === 'moyu') {
+    const charStart = moyuCurrentPage * moyuCharsPerPage;
+    currentLine = getMoyuLineForCharOffset(charStart);
+  } else {
+    currentLine = currentPage * linesPerPage;
+  }
+  for (let i = chapters.length - 1; i >= 0; i--) {
+    if (chapters[i].lineIndex <= currentLine) return i;
+  }
+  return -1;
+}
+
+// 二分查找：字符偏移对应的行索引
+function getMoyuLineForCharOffset(charOffset) {
+  if (moyuLineOffsets.length === 0) return 0;
+  let lo = 0, hi = moyuLineOffsets.length - 1;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi + 1) / 2);
+    if (moyuLineOffsets[mid] <= charOffset) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return lo;
+}
+
+// 跳转到指定章节
+function jumpToChapter(chapterIndex) {
+  if (chapterIndex < 0 || chapterIndex >= chapters.length) return;
+  const ch = chapters[chapterIndex];
+
+  if (MODE === 'moyu') {
+    const charOffset = moyuLineOffsets[ch.lineIndex] || 0;
+    moyuCurrentPage = Math.floor(charOffset / moyuCharsPerPage);
+    if (moyuCurrentPage >= totalPages) moyuCurrentPage = totalPages - 1;
+    if (moyuCurrentPage < 0) moyuCurrentPage = 0;
+    currentPage = moyuCurrentPage;
+    renderMoyuPage();
+    updateProgress();
+    saveProgressDebounced();
+  } else {
+    currentPage = Math.floor(ch.lineIndex / linesPerPage);
+    renderReaderPage();
+    scrollToTop();
+    updateProgress();
+    saveProgressDebounced();
+  }
+  highlightCurrentChapter();
+  showToast('跳转到: ' + ch.title);
+}
+
+// 上一章
+function prevChapter() {
+  if (chapters.length === 0) {
+    showToast('未检测到章节');
+    return;
+  }
+  const current = getCurrentChapterIndex();
+  if (current > 0) {
+    jumpToChapter(current - 1);
+  } else {
+    showToast('已经是第一章');
+  }
+}
+
+// 下一章
+function nextChapter() {
+  if (chapters.length === 0) {
+    showToast('未检测到章节');
+    return;
+  }
+  const current = getCurrentChapterIndex();
+  if (current >= 0 && current < chapters.length - 1) {
+    jumpToChapter(current + 1);
+  } else {
+    showToast('已经是最后一章');
+  }
 }
 
 // ===== 进度更新 =====
@@ -457,6 +606,14 @@ function bindEvents() {
   });
   document.getElementById('closeBookmarkPanel').addEventListener('click', () => {
     document.getElementById('bookmarkPanel').classList.remove('show');
+  });
+
+  // 章节列表
+  document.getElementById('chapterListBtn').addEventListener('click', () => {
+    document.getElementById('chapterPanel').classList.toggle('show');
+  });
+  document.getElementById('closeChapterPanel').addEventListener('click', () => {
+    document.getElementById('chapterPanel').classList.remove('show');
   });
 
   // 主题设置面板
@@ -683,6 +840,14 @@ function handleKeyDown(e) {
         switchMode('window');
       }
       break;
+    case '[':
+      e.preventDefault();
+      prevChapter();
+      break;
+    case ']':
+      e.preventDefault();
+      nextChapter();
+      break;
     case 'h':
     case 'H':
       if (MODE === 'moyu') {
@@ -721,6 +886,19 @@ function handleContextAction(action) {
       break;
     case 'next':
       nextPage();
+      break;
+    case 'prevChapter':
+      prevChapter();
+      break;
+    case 'nextChapter':
+      nextChapter();
+      break;
+    case 'chapterList':
+      if (MODE === 'moyu') {
+        switchMode('window');
+      } else {
+        document.getElementById('chapterPanel').classList.toggle('show');
+      }
       break;
     case 'hide':
       window.api.hideMoyu();

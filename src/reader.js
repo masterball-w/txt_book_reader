@@ -357,12 +357,49 @@ function scrollToTop() {
 
 // ===== 章节解析 =====
 function parseChapters() {
-  chapters = [];
+  // 第一步：找到所有匹配的行
+  const allMatches = [];
   for (let i = 0; i < bookLines.length; i++) {
     const line = bookLines[i].trim();
     if (CHAPTER_REGEX.test(line) && line.length <= 100) {
-      chapters.push({ title: line, lineIndex: i });
+      allMatches.push({ title: line, lineIndex: i });
     }
+  }
+
+  if (allMatches.length === 0) {
+    chapters = [];
+    return;
+  }
+
+  // 第二步：检测并跳过书籍开头的目录区(TOC)
+  // TOC特征：连续3+个匹配项之间间隔 ≤3 行
+  // 正文章节特征：匹配项之间间隔远大于此（通常数十至数百行）
+  let tocEnd = 0; // allMatches 中 TOC 结束后的第一个索引
+  let clusterSize = 1;
+
+  for (let i = 1; i < allMatches.length; i++) {
+    const gap = allMatches[i].lineIndex - allMatches[i - 1].lineIndex;
+    if (gap <= 3) {
+      clusterSize++;
+    } else {
+      if (clusterSize >= 3) {
+        // 找到 TOC 簇，跳过它
+        tocEnd = i;
+        break;
+      }
+      clusterSize = 1;
+    }
+  }
+  // 如果整个匹配列表都是一个连续簇，也视为 TOC
+  if (clusterSize >= 3 && tocEnd === 0) {
+    tocEnd = allMatches.length;
+  }
+
+  chapters = allMatches.slice(tocEnd);
+
+  // 兜底：如果全被跳过了，保留全部
+  if (chapters.length === 0) {
+    chapters = allMatches;
   }
 }
 
@@ -767,7 +804,11 @@ function bindEvents() {
   if (MODE === 'moyu') {
     document.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      window.api.showMoyuMenu((action) => {
+      const menuData = {
+        bookmarks: bookmarks.map(bm => ({ label: bm.label, page: bm.page })),
+        chapters: chapters.map(ch => ({ title: ch.title, lineIndex: ch.lineIndex }))
+      };
+      window.api.showMoyuMenu(menuData, (action) => {
         handleContextAction(action);
       });
     });
@@ -871,16 +912,31 @@ function handleKeyDown(e) {
 
 // ===== 右键菜单动作 =====
 function handleContextAction(action) {
+  // 处理原生子菜单的书签跳转
+  if (action.startsWith('bm_jump:')) {
+    const idx = parseInt(action.split(':')[1]);
+    if (bookmarks[idx]) {
+      goToLineIndex(bookmarks[idx].page);
+      showToast('跳转到书签: ' + bookmarks[idx].label);
+    }
+    return;
+  }
+  // 处理原生子菜单的章节跳转
+  if (action.startsWith('ch_jump:')) {
+    const idx = parseInt(action.split(':')[1]);
+    if (chapters[idx]) {
+      jumpToChapter(idx);
+    }
+    return;
+  }
+
   switch (action) {
     case 'bookmark':
       saveBookmark();
       break;
     case 'bookmarkList':
-      if (MODE === 'moyu') {
-        switchMode('window');
-      } else {
-        document.getElementById('bookmarkPanel').classList.toggle('show');
-      }
+      // 仅窗口/全屏模式会触发（摸鱼模式用原生子菜单）
+      document.getElementById('bookmarkPanel').classList.toggle('show');
       break;
     case 'mode-window':
       switchMode('window');
@@ -904,11 +960,8 @@ function handleContextAction(action) {
       nextChapter();
       break;
     case 'chapterList':
-      if (MODE === 'moyu') {
-        switchMode('window');
-      } else {
-        document.getElementById('chapterPanel').classList.toggle('show');
-      }
+      // 仅窗口/全屏模式会触发（摸鱼模式用原生子菜单）
+      document.getElementById('chapterPanel').classList.toggle('show');
       break;
     case 'hide':
       window.api.hideMoyu();

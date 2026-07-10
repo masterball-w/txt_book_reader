@@ -48,9 +48,9 @@ contextBridge.exposeInMainWorld('api', {
   // 摸鱼窗口拖动
   moyuDrag: (dx, dy) => ipcRenderer.send('moyu-drag', { dx, dy }),
 
-  // 摸鱼模式原生右键菜单
-  showMoyuMenu: (callback) => {
-    ipcRenderer.send('moyu-context-menu');
+  // 摸鱼模式原生右键菜单（传入书签和章节数据用于构建子菜单）
+  showMoyuMenu: (data, callback) => {
+    ipcRenderer.send('moyu-context-menu', data);
     ipcRenderer.once('moyu-menu-action', (event, action) => callback(action));
   },
 

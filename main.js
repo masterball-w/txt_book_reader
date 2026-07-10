@@ -574,11 +574,30 @@ ipcMain.on('moyu-drag', (event, { dx, dy }) => {
 });
 
 // ---- 摸鱼模式原生右键菜单 ----
-ipcMain.on('moyu-context-menu', (event) => {
+ipcMain.on('moyu-context-menu', (event, data) => {
+  const bookmarks = (data && data.bookmarks) || [];
+  const chapters = (data && data.chapters) || [];
+
+  // 书签子菜单
+  const bookmarkSubmenu = bookmarks.length > 0
+    ? bookmarks.map((bm, i) => ({
+        label: bm.label ? (bm.label.length > 50 ? bm.label.substring(0, 50) + '...' : bm.label) : `书签${i + 1}`,
+        click: () => sendMoyuAction(event, `bm_jump:${i}`)
+      }))
+    : [{ label: '暂无书签', enabled: false }];
+
+  // 章节子菜单
+  const chapterSubmenu = chapters.length > 0
+    ? chapters.map((ch, i) => ({
+        label: ch.title.length > 50 ? ch.title.substring(0, 50) + '...' : ch.title,
+        click: () => sendMoyuAction(event, `ch_jump:${i}`)
+      }))
+    : [{ label: '未检测到章节', enabled: false }];
+
   const menu = Menu.buildFromTemplate([
     { label: '🔖 保存书签', click: () => sendMoyuAction(event, 'bookmark') },
-    { label: '📋 书签列表', click: () => sendMoyuAction(event, 'bookmarkList') },
-    { label: '📑 章节目录', click: () => sendMoyuAction(event, 'chapterList') },
+    { label: '📋 书签列表', submenu: bookmarkSubmenu },
+    { label: '📑 章节目录', submenu: chapterSubmenu },
     { type: 'separator' },
     { label: '🪟 切换到窗口模式', click: () => sendMoyuAction(event, 'mode-window') },
     { label: '🖥️ 切换到全屏模式', click: () => sendMoyuAction(event, 'mode-fullscreen') },

@@ -19,8 +19,8 @@ let readingTimeSeconds = 0;
 let readingTimer = null;
 let lastSaveTime = 0;
 
-// 摸鱼模式分页大小（每页显示的字符数）
-const MOYU_CHARS_PER_PAGE = 80;
+// 摸鱼模式分页大小（动态计算）
+let moyuCharsPerPage = 40;
 let moyuPageContent = [];
 let moyuCurrentPage = 0;
 
@@ -146,13 +146,41 @@ async function init() {
 }
 
 // ===== 分页计算 =====
+function calculateMoyuCharsPerPage() {
+  const moyuText = document.getElementById('moyuText');
+  if (!moyuText) return 40;
+
+  const containerWidth = moyuText.clientWidth;
+  if (containerWidth <= 0) return 40;
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const style = getComputedStyle(moyuText);
+  const fontSize = style.fontSize || '13px';
+  const fontFamily = style.fontFamily || '"Microsoft YaHei", sans-serif';
+  ctx.font = `${fontSize} ${fontFamily}`;
+
+  const fullText = bookLines.join(' ').replace(/\s+/g, ' ').trim();
+  let width = 0;
+  let count = 0;
+  const maxWidth = containerWidth - 6;
+
+  while (count < fullText.length && width < maxWidth) {
+    width += ctx.measureText(fullText[count]).width;
+    if (width < maxWidth) count++;
+  }
+
+  return Math.max(10, count);
+}
+
 function calculatePages() {
   if (MODE === 'moyu') {
-    // 摸鱼模式：将所有文本拼接后按字符数分页
-    const fullText = bookLines.join('\n');
+    // 摸鱼模式：动态测量可见宽度后按字符精确分页
+    moyuCharsPerPage = calculateMoyuCharsPerPage();
+    const fullText = bookLines.join(' ').replace(/\s+/g, ' ').trim();
     moyuPageContent = [];
-    for (let i = 0; i < fullText.length; i += MOYU_CHARS_PER_PAGE) {
-      moyuPageContent.push(fullText.substring(i, i + MOYU_CHARS_PER_PAGE));
+    for (let i = 0; i < fullText.length; i += moyuCharsPerPage) {
+      moyuPageContent.push(fullText.substring(i, i + moyuCharsPerPage));
     }
     totalPages = moyuPageContent.length;
     if (currentPage >= totalPages) currentPage = totalPages - 1;

@@ -1,0 +1,3 @@
+[submodule "shu"]
+	path = shu
+	url = https://github.com/dooshu/shu.git

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>阅读</title>
+  <link rel="stylesheet" href="reader.css">
+</head>
+<body class="mode-window">
+  <!-- 窗口/全屏模式 -->
+  <div id="readerContainer" class="reader-container">
+    <!-- 工具栏 -->
+    <header class="reader-toolbar" id="toolbar">
+      <div class="toolbar-left">
+        <button class="toolbar-btn" id="backBtn" title="返回">← 返回</button>
+        <span class="toolbar-title" id="bookTitle">加载中...</span>
+      </div>
+      <div class="toolbar-right">
+        <button class="toolbar-btn" id="prevPageBtn" title="上一页 (←)">◀</button>
+        <span class="page-info" id="pageInfo">0 / 0</span>
+        <button class="toolbar-btn" id="nextPageBtn" title="下一页 (→)">▶</button>
+        <div class="toolbar-divider"></div>
+        <button class="toolbar-btn" id="fontDecreaseBtn" title="缩小字体">A-</button>
+        <button class="toolbar-btn" id="fontIncreaseBtn" title="放大字体">A+</button>
+        <div class="toolbar-divider"></div>
+        <button class="toolbar-btn" id="bookmarkBtn" title="保存书签 (Ctrl+B)">🔖</button>
+        <button class="toolbar-btn" id="bookmarkListBtn" title="书签列表">📋</button>
+        <div class="toolbar-divider"></div>
+        <button class="toolbar-btn" id="settingsBtn" title="主题设置">⚙️</button>
+        <button class="toolbar-btn mode-btn" data-mode="window" title="窗口模式">🪟</button>
+        <button class="toolbar-btn mode-btn" data-mode="fullscreen" title="全屏模式">🖥️</button>
+        <button class="toolbar-btn mode-btn" data-mode="moyu" title="摸鱼模式">🐟</button>
+      </div>
+    </header>
+
+    <!-- 阅读内容区 -->
+    <div class="reader-content" id="readerContent">
+      <div class="reader-text" id="readerText"></div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <footer class="reader-footer" id="footer">
+      <div class="footer-left">
+        <span id="readingTime">阅读时长: 0分钟</span>
+      </div>
+      <div class="footer-center">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <span id="progressText">0%</span>
+      </div>
+      <div class="footer-right">
+        <span id="bookInfo"></span>
+      </div>
+    </footer>
+
+    <!-- 书签列表面板 -->
+    <div class="bookmark-panel" id="bookmarkPanel">
+      <div class="bookmark-panel-header">
+        <span>书签列表</span>
+        <button class="close-btn" id="closeBookmarkPanel">✕</button>
+      </div>
+      <div class="bookmark-list" id="bookmarkList">
+        <div class="bookmark-empty">暂无书签</div>
+      </div>
+    </div>
+
+    <!-- 主题设置面板 -->
+    <div class="settings-panel" id="settingsPanel">
+      <div class="settings-panel-header">
+        <span>主题设置</span>
+        <button class="close-btn" id="closeSettingsPanel">✕</button>
+      </div>
+      <div class="settings-content">
+        <div class="settings-section">
+          <div class="settings-label">预设主题</div>
+          <div class="preset-themes">
+            <button class="preset-btn active" data-preset="dark">暗色</button>
+            <button class="preset-btn" data-preset="light">亮色</button>
+            <button class="preset-btn" data-preset="sepia">护眼</button>
+            <button class="preset-btn" data-preset="night">夜间</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <label class="settings-checkbox">
+            <input type="checkbox" id="followSystemCheck"> 跟随系统深色模式
+          </label>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-label">自定义颜色</div>
+          <div class="color-picker-row">
+            <span class="color-label">背景色</span>
+            <input type="color" id="bgColorInput" class="color-input" value="#1a1a2e">
+            <input type="text" id="bgColorText" class="color-text" value="#1a1a2e">
+            <button class="screen-pick-btn" data-target="bg" title="屏幕取色">🔍</button>
+          </div>
+          <div class="color-picker-row">
+            <span class="color-label">文字色</span>
+            <input type="color" id="textColorInput" class="color-input" value="#e0e0e0">
+            <input type="text" id="textColorText" class="color-text" value="#e0e0e0">
+            <button class="screen-pick-btn" data-target="text" title="屏幕取色">🔍</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-label">字体大小: <span id="fontSizeValue">18</span>px</div>
+          <input type="range" id="fontSizeSlider" class="slider" min="12" max="36" value="18">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 摸鱼模式 -->
+  <div id="moyuContainer" class="moyu-container" style="display:none;">
+    <div class="moyu-text" id="moyuText"></div>
+    <div class="moyu-controls">
+      <span class="moyu-page" id="moyuPage">0/0</span>
+    </div>
+  </div>
+
+  <!-- 右键菜单 -->
+  <div class="context-menu" id="contextMenu">
+    <div class="context-menu-item" data-action="bookmark">🔖 保存书签</div>
+    <div class="context-menu-item" data-action="bookmarkList">📋 书签列表</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="mode-window">🪟 切换到窗口模式</div>
+    <div class="context-menu-item" data-action="mode-fullscreen">🖥️ 切换到全屏模式</div>
+    <div class="context-menu-item" data-action="mode-moyu">🐟 切换到摸鱼模式</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="prev">◀ 上一页</div>
+    <div class="context-menu-item" data-action="next">▶ 下一页</div>
+    <div class="context-menu-divider" id="moyuHideDivider"></div>
+    <div class="context-menu-item" data-action="hide" id="moyuHideItem">🙈 隐藏 (Ctrl+`)</div>
+  </div>
+
+  <script src="reader.js"></script>
+</body>
+</html>

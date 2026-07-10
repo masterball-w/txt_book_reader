@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>书库阅读器</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部栏 -->
+    <header class="topbar">
+      <div class="logo">
+        <span class="logo-icon">📚</span>
+        <span class="logo-text">书库阅读器</span>
+      </div>
+      <div class="search-area">
+        <div class="search-tabs">
+          <button class="search-tab active" data-type="fuzzy">书名模糊</button>
+          <button class="search-tab" data-type="title">书名精确</button>
+          <button class="search-tab" data-type="author">作者</button>
+          <button class="search-tab" data-type="content">内容搜索</button>
+        </div>
+        <div class="search-input-wrap">
+          <input type="text" id="searchInput" placeholder="输入关键词搜索..." />
+          <button id="searchBtn">搜索</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主体 -->
+    <div class="main-body">
+      <!-- 侧边栏 -->
+      <aside class="sidebar">
+        <nav class="nav-menu">
+          <div class="nav-section">
+            <div class="nav-section-title">书库</div>
+            <button class="nav-item active" data-view="cn">
+              <span class="nav-icon">🇨🇳</span>
+              <span class="nav-label">中文</span>
+              <span class="nav-count" id="count-cn">0</span>
+            </button>
+            <button class="nav-item" data-view="en">
+              <span class="nav-icon">📖</span>
+              <span class="nav-label">英文</span>
+              <span class="nav-count" id="count-en">0</span>
+            </button>
+            <button class="nav-item" data-view="yi">
+              <span class="nav-icon">🌐</span>
+              <span class="nav-label">译文</span>
+              <span class="nav-count" id="count-yi">0</span>
+            </button>
+          </div>
+          <div class="nav-section">
+            <div class="nav-section-title">我的</div>
+            <button class="nav-item" data-view="shelf">
+              <span class="nav-icon">🔖</span>
+              <span class="nav-label">书架</span>
+              <span class="nav-count" id="count-shelf">0</span>
+            </button>
+          </div>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="total-time">
+            <span class="time-label">总阅读时长</span>
+            <span class="time-value" id="totalTime">0分钟</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 内容区 -->
+      <main class="content">
+        <!-- 书籍网格 -->
+        <div id="bookGrid" class="book-grid"></div>
+        <!-- 搜索结果 -->
+        <div id="searchResults" class="search-results" style="display:none;"></div>
+        <!-- 书架 -->
+        <div id="shelfView" class="shelf-view" style="display:none;"></div>
+        <!-- 加载提示 -->
+        <div id="loading" class="loading" style="display:none;">
+          <div class="spinner"></div>
+          <p>正在搜索...</p>
+        </div>
+        <!-- 空状态 -->
+        <div id="emptyState" class="empty-state" style="display:none;">
+          <p>暂无数据</p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="index.js"></script>
+</body>
+</html>

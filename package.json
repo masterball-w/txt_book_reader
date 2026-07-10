@@ -1,0 +1,15 @@
+{
+  "name": "shu-reader",
+  "version": "1.0.0",
+  "description": "书库阅读器 - 支持全屏/窗口/摸鱼三种阅读模式",
+  "main": "main.js",
+  "scripts": {
+    "start": "node launch.js",
+    "dev": "node launch.js --dev"
+  },
+  "author": "shu-reader",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^30.0.0"
+  }
+}

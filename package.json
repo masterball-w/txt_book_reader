@@ -5,11 +5,84 @@
   "main": "main.js",
   "scripts": {
     "start": "node launch.js",
-    "dev": "node launch.js --dev"
+    "dev": "node launch.js --dev",
+    "build": "electron-builder --win --x64",
+    "build:dir": "electron-builder --win --x64 --dir"
   },
   "author": "shu-reader",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^30.0.0"
+    "electron": "^30.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.doosho.shureader",
+    "productName": "书库阅读器",
+    "copyright": "Copyright © 2024 shu-reader",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "shu/cn",
+        "to": "shu/cn",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "shu/en",
+        "to": "shu/en",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "shu/yi",
+        "to": "shu/yi",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "shu/README.md",
+        "to": "shu/README.md"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "ShuReader-Setup-${version}-${arch}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": ["zh_CN", "en_US"],
+      "language": "2052",
+      "displayLanguageSelector": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "书库阅读器",
+      "uninstallDisplayName": "书库阅读器",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "menuCategory": "书库阅读器",
+      "include": "build/installer.nsh",
+      "warningsAsErrors": false
+    },
+    "squirrelWindows": null,
+    "publish": {
+      "provider": "github",
+      "owner": "masterball-w",
+      "repo": "txt_book_reader",
+      "releaseType": "release"
+    }
   }
 }

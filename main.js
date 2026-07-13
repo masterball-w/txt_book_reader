@@ -18,8 +18,12 @@ if (!gotTheLock) {
   });
 }
 
-// 书库根目录（上级目录）
-const BOOKS_ROOT = path.join(__dirname, '..');
+// 书库根目录
+// 打包模式：书籍在 resources/shu 目录下
+// 开发模式：书籍在项目上级目录（shu 子模块）
+const BOOKS_ROOT = app.isPackaged
+  ? path.join(process.resourcesPath, 'shu')
+  : path.join(__dirname, 'shu');
 // 用户数据目录（延迟初始化）
 let USER_DATA_DIR = null;
 let DATA_FILE = null;

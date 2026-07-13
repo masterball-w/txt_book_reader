@@ -30,10 +30,11 @@ let moyuFullText = '';
 let chapters = [];          // [{ title, lineIndex }]
 let moyuLineOffsets = [];   // moyuLineOffsets[i] = bookLines[i] 在 moyuFullText 中的字符偏移
 
-// 章节匹配正则（参考 dooshu README 正则规则）
+// 章节匹配正则（参考 doosho README 正则规则）
 // 匹配：第N章/节/回/卷/部/篇（中文数字或阿拉伯数字）
+// 匹配：卷N（无"第"前缀，如聊斋志异的"卷一""卷二"）
 // 匹配：Chapter N（英文）
-const CHAPTER_REGEX = /^第[\d一二三四五六七八九十百千万零两壹贰叁肆伍陆柒捌玖拾佰仟]+[章节回卷部篇]\s*.*|^Chapter\s+[\dIVXLCDMivxlcdm]+.*/i;
+const CHAPTER_REGEX = /^第[\d一二三四五六七八九十百千万零两壹贰叁肆伍陆柒捌玖拾佰仟]+[章节回卷部篇]\s*.*|^卷[\d一二三四五六七八九十百千万零两壹贰叁肆伍陆柒捌玖拾佰仟]+\s*.*|^Chapter\s+[\dIVXLCDMivxlcdm]+.*/i;
 
 // 主题预设
 const THEME_PRESETS = {
@@ -356,10 +357,27 @@ function scrollToTop() {
 }
 
 // ===== 章节解析 =====
-function parseChapters() {
-  // 第一步：找到所有匹配的行
-  const allMatches = [];
+
+// 查找正文起始行：每本书在目录和正文之间都有一块 doosho.com 水印分隔符
+// 找到最后一个包含 doosho.com 的行，正文从此行之后开始
+function findMainTextStart() {
+  let lastDooshoLine = -1;
   for (let i = 0; i < bookLines.length; i++) {
+    if (bookLines[i].includes('doosho.com')) {
+      lastDooshoLine = i;
+    }
+  }
+  // 未找到分隔符时返回 0（从头搜索，退回到旧逻辑）
+  return lastDooshoLine >= 0 ? lastDooshoLine + 1 : 0;
+}
+
+function parseChapters() {
+  // 第一步：用 doosho.com 分隔符精确定位正文起始行
+  const mainTextStart = findMainTextStart();
+
+  // 第二步：只在正文中搜索章节标题（彻底排除目录区）
+  const allMatches = [];
+  for (let i = mainTextStart; i < bookLines.length; i++) {
     const line = bookLines[i].trim();
     if (CHAPTER_REGEX.test(line) && line.length <= 100) {
       allMatches.push({ title: line, lineIndex: i });
@@ -367,40 +385,20 @@ function parseChapters() {
   }
 
   if (allMatches.length === 0) {
-    chapters = [];
+    // 兜底：正文中未找到章节，尝试在全文中搜索（含目录区）
+    if (mainTextStart > 0) {
+      for (let i = 0; i < bookLines.length; i++) {
+        const line = bookLines[i].trim();
+        if (CHAPTER_REGEX.test(line) && line.length <= 100) {
+          allMatches.push({ title: line, lineIndex: i });
+        }
+      }
+    }
+    chapters = allMatches;
     return;
   }
 
-  // 第二步：检测并跳过书籍开头的目录区(TOC)
-  // TOC特征：连续3+个匹配项之间间隔 ≤3 行
-  // 正文章节特征：匹配项之间间隔远大于此（通常数十至数百行）
-  let tocEnd = 0; // allMatches 中 TOC 结束后的第一个索引
-  let clusterSize = 1;
-
-  for (let i = 1; i < allMatches.length; i++) {
-    const gap = allMatches[i].lineIndex - allMatches[i - 1].lineIndex;
-    if (gap <= 3) {
-      clusterSize++;
-    } else {
-      if (clusterSize >= 3) {
-        // 找到 TOC 簇，跳过它
-        tocEnd = i;
-        break;
-      }
-      clusterSize = 1;
-    }
-  }
-  // 如果整个匹配列表都是一个连续簇，也视为 TOC
-  if (clusterSize >= 3 && tocEnd === 0) {
-    tocEnd = allMatches.length;
-  }
-
-  chapters = allMatches.slice(tocEnd);
-
-  // 兜底：如果全被跳过了，保留全部
-  if (chapters.length === 0) {
-    chapters = allMatches;
-  }
+  chapters = allMatches;
 }
 
 function renderChapterList() {

@@ -184,7 +184,7 @@ function getCurrentLineIndex() {
   }
 }
 
-function goToLineIndex(lineIndex) {
+function goToLineIndex(lineIndex, targetChapterIdx) {
   if (lineIndex < 0) lineIndex = 0;
   if (lineIndex >= bookLines.length) lineIndex = bookLines.length - 1;
 
@@ -203,7 +203,7 @@ function goToLineIndex(lineIndex) {
     scrollToTop();
   }
   updateProgress();
-  highlightCurrentChapter();
+  highlightCurrentChapter(targetChapterIdx);
 }
 
 // ===== 预计算摸鱼全文 =====
@@ -439,8 +439,8 @@ function renderChapterList() {
   });
 }
 
-function highlightCurrentChapter() {
-  const current = getCurrentChapterIndex();
+function highlightCurrentChapter(chapterIdx) {
+  const current = (chapterIdx !== undefined) ? chapterIdx : getCurrentChapterIndex();
   document.querySelectorAll('.chapter-item').forEach((item, i) => {
     item.classList.toggle('active', i === current);
   });
@@ -472,7 +472,7 @@ function getMoyuLineForCharOffset(charOffset) {
 function jumpToChapter(chapterIndex) {
   if (chapterIndex < 0 || chapterIndex >= chapters.length) return;
   const ch = chapters[chapterIndex];
-  goToLineIndex(ch.lineIndex);
+  goToLineIndex(ch.lineIndex, chapterIndex);
   showToast('跳转到: ' + ch.title);
 }
 

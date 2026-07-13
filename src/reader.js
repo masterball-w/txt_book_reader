@@ -30,6 +30,9 @@ let moyuFullText = '';
 let chapters = [];          // [{ title, lineIndex }]
 let moyuLineOffsets = [];   // moyuLineOffsets[i] = bookLines[i] 在 moyuFullText 中的字符偏移
 
+// 窗口/全屏模式：按章节边界分页
+let pageStartLines = [];    // pageStartLines[i] = 第i页的起始行索引
+
 // 章节匹配正则（参考 doosho README 正则规则）
 // 匹配：第N章/节/回/卷/部/篇（中文数字或阿拉伯数字）
 // 匹配：卷N（无"第"前缀，如聊斋志异的"卷一""卷二"）
@@ -117,6 +120,9 @@ async function init() {
   parseChapters();
   renderChapterList();
 
+  // 预计算窗口/全屏模式的分页边界（按章节断页）
+  computePageBoundaries();
+
   // 获取书名
   const titleLine = bookLines[0] || '未知书名';
   let bookTitle = titleLine;
@@ -180,7 +186,7 @@ function getCurrentLineIndex() {
     const charStart = moyuCurrentPage * moyuCharsPerPage;
     return getMoyuLineForCharOffset(charStart);
   } else {
-    return currentPage * linesPerPage;
+    return pageStartLines[currentPage] || 0;
   }
 }
 
@@ -196,7 +202,17 @@ function goToLineIndex(lineIndex, targetChapterIdx) {
     currentPage = moyuCurrentPage;
     renderMoyuPage();
   } else {
-    currentPage = Math.floor(lineIndex / linesPerPage);
+    // 二分查找 lineIndex 所在的页
+    let lo = 0, hi = pageStartLines.length - 1;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi + 1) / 2);
+      if (pageStartLines[mid] <= lineIndex) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    currentPage = lo;
     if (currentPage >= totalPages) currentPage = totalPages - 1;
     if (currentPage < 0) currentPage = 0;
     renderReaderPage();
@@ -252,6 +268,32 @@ function calculateMoyuCharsPerPage() {
   return Math.max(10, count);
 }
 
+function computePageBoundaries() {
+  pageStartLines = [];
+  if (bookLines.length === 0) return;
+
+  // 构建章节起始行的集合（用于断页）
+  const chapterStarts = new Set(chapters.map(ch => ch.lineIndex));
+
+  let line = 0;
+  while (line < bookLines.length) {
+    pageStartLines.push(line);
+    // 默认每页 linesPerPage 行
+    let pageEnd = line + linesPerPage;
+    if (pageEnd >= bookLines.length) break;
+
+    // 检查 [line+1, pageEnd) 范围内是否有章节起始行
+    // 如果有，在第一个章节起始行处断页
+    for (let i = line + 1; i < pageEnd; i++) {
+      if (chapterStarts.has(i)) {
+        pageEnd = i;
+        break;
+      }
+    }
+    line = pageEnd;
+  }
+}
+
 function calculatePages() {
   if (MODE === 'moyu') {
     moyuCharsPerPage = calculateMoyuCharsPerPage();
@@ -265,7 +307,8 @@ function calculatePages() {
     if (moyuCurrentPage < 0) moyuCurrentPage = 0;
     currentPage = moyuCurrentPage;
   } else {
-    totalPages = Math.ceil(bookLines.length / linesPerPage);
+    // 使用按章节边界预计算的页边界
+    totalPages = pageStartLines.length || 1;
     if (currentPage >= totalPages) currentPage = totalPages - 1;
     if (currentPage < 0) currentPage = 0;
   }
@@ -285,8 +328,8 @@ function renderPage() {
 
 function renderReaderPage() {
   const readerText = document.getElementById('readerText');
-  const startIdx = currentPage * linesPerPage;
-  const endIdx = Math.min(startIdx + linesPerPage, bookLines.length);
+  const startIdx = pageStartLines[currentPage] || 0;
+  const endIdx = (currentPage + 1 < pageStartLines.length) ? pageStartLines[currentPage + 1] : bookLines.length;
   const lines = bookLines.slice(startIdx, endIdx);
 
   readerText.style.fontSize = fontSize + 'px';

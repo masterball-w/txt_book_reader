@@ -367,38 +367,57 @@ function findMainTextStart() {
       lastDooshoLine = i;
     }
   }
-  // 未找到分隔符时返回 0（从头搜索，退回到旧逻辑）
   return lastDooshoLine >= 0 ? lastDooshoLine + 1 : 0;
 }
 
 function parseChapters() {
-  // 第一步：用 doosho.com 分隔符精确定位正文起始行
   const mainTextStart = findMainTextStart();
 
-  // 第二步：只在正文中搜索章节标题（彻底排除目录区）
-  const allMatches = [];
-  for (let i = mainTextStart; i < bookLines.length; i++) {
-    const line = bookLines[i].trim();
-    if (CHAPTER_REGEX.test(line) && line.length <= 100) {
-      allMatches.push({ title: line, lineIndex: i });
-    }
-  }
-
-  if (allMatches.length === 0) {
-    // 兜底：正文中未找到章节，尝试在全文中搜索（含目录区）
-    if (mainTextStart > 0) {
-      for (let i = 0; i < bookLines.length; i++) {
-        const line = bookLines[i].trim();
-        if (CHAPTER_REGEX.test(line) && line.length <= 100) {
-          allMatches.push({ title: line, lineIndex: i });
-        }
+  // 无分隔符时，退回到正则匹配
+  if (mainTextStart === 0) {
+    const allMatches = [];
+    for (let i = 0; i < bookLines.length; i++) {
+      const line = bookLines[i].trim();
+      if (CHAPTER_REGEX.test(line) && line.length <= 100) {
+        allMatches.push({ title: line, lineIndex: i });
       }
     }
     chapters = allMatches;
     return;
   }
 
-  chapters = allMatches;
+  // 第一步：从目录区（分隔符之前）提取章节名
+  // 跳过第 0 行（书名），收集所有非空、非 doosho.com 行作为目录条目
+  const tocEntries = [];
+  const seen = new Set();
+  for (let i = 1; i < mainTextStart; i++) {
+    const title = bookLines[i].trim();
+    if (title && !title.includes('doosho.com') && !seen.has(title)) {
+      seen.add(title);
+      tocEntries.push(title);
+    }
+  }
+
+  // 第二步：建立正文中 "行内容 -> 首次出现行索引" 的映射
+  const mainTextMap = new Map();
+  for (let i = mainTextStart; i < bookLines.length; i++) {
+    const trimmed = bookLines[i].trim();
+    if (!mainTextMap.has(trimmed)) {
+      mainTextMap.set(trimmed, i);
+    }
+  }
+
+  // 第三步：用目录条目在正文中精确匹配定位
+  chapters = [];
+  for (const title of tocEntries) {
+    const lineIndex = mainTextMap.get(title);
+    if (lineIndex !== undefined) {
+      chapters.push({ title, lineIndex });
+    }
+  }
+
+  // 按行索引排序，确保章节按阅读顺序排列
+  chapters.sort((a, b) => a.lineIndex - b.lineIndex);
 }
 
 function renderChapterList() {

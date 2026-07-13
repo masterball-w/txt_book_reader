@@ -2,14 +2,30 @@
 
 基于 Electron 的 TXT 电子书阅读器，支持全屏、窗口、摸鱼三种阅读模式，内置书签、书架、搜索、主题自定义等功能。
 
+![阅读界面](docs/screenshots/阅读界面.png)
+
 ## 功能特性
 
 ### 阅读模式
+
+支持三种阅读模式，可根据场景自由切换：
+
+![阅读模式](docs/screenshots/阅读模式.png)
+
 - **窗口模式** — 标准窗口阅读，工具栏可操作
 - **全屏模式** — 沉浸式全屏阅读，鼠标悬停显示工具栏
 - **摸鱼模式** — 无边框透明长条阅读栏，始终置顶，`Ctrl+`` 一键隐藏/显示
 
+摸鱼模式下，阅读栏以极简长条形式悬浮于屏幕上方，不影响正常工作，随时翻页：
+
+![摸鱼模式的阅读界面](docs/screenshots/摸鱼模式的阅读界面.png)
+
 ### 搜索功能
+
+支持多种搜索方式，快速定位想读的书籍：
+
+![搜索书籍](docs/screenshots/搜索书籍.png)
+
 - 书名模糊搜索
 - 书名精确搜索
 - 作者搜索
@@ -21,6 +37,11 @@
 - 阅读时长统计
 
 ### 主题系统
+
+内置四种预设主题，支持自定义背景色、文字色和字号，并提供屏幕取色功能：
+
+![自定义主题和字号](docs/screenshots/自定义主题和字号.png)
+
 - 四种预设主题：暗色、亮色、护眼（Sepia）、夜间（纯黑）
 - 自定义背景色和文字色
 - **屏幕取色** — 点击取色按钮截取屏幕，放大镜精准取色
@@ -60,6 +81,8 @@ txt_book_reader/
 │   ├── reader.html   # 阅读器界面
 │   ├── reader.css    # 阅读器样式
 │   └── reader.js     # 阅读器逻辑
+├── docs/
+│   └── screenshots/  # 截图
 └── shu/              # 书籍资源（Git 子模块）
     ├── cn/           # 中文书籍（books.json + *.txt）
     ├── en/           # 英文书籍
@@ -68,11 +91,17 @@ txt_book_reader/
 
 ## 安装与运行
 
-### 前置要求
+### 方式一：下载安装包（推荐）
+
+前往 [Releases 页面](https://github.com/masterball-w/txt_book_reader/releases) 下载最新的 `ShuReader-Setup-x.x.x-x64.exe`，双击安装即可使用。
+
+### 方式二：从源码运行
+
+#### 前置要求
 - [Node.js](https://nodejs.org/) 16+
 - npm 或 yarn
 
-### 步骤
+#### 步骤
 
 ```bash
 # 1. 克隆仓库（含子模块）
@@ -99,9 +128,15 @@ Windows 用户也可以直接双击 `start.bat` 启动。
 npm run dev    # 启动并自动打开 DevTools
 ```
 
+### 构建安装包
+
+```bash
+npm run build    # 构建 Windows NSIS 安装包
+```
+
 ## 资源文件说明
 
-本项目的书籍资源文件（`shu/` 目录）来自开源仓库 **[dooshu/shu](https://github.com/dooshu/shu)**，以 Git 子模块的形式引入。
+本项目的书籍资源文件（`shu/` 目录）来自开源仓库 **[doosho/shu](https://github.com/doosho/shu)**，以 Git 子模块的形式引入。
 
 资源目录结构：
 - `shu/cn/` — 中文书籍（约 1645 本）
@@ -112,7 +147,7 @@ npm run dev    # 启动并自动打开 DevTools
 
 ## 致谢
 
-特别感谢 **[dooshu](https://github.com/dooshu)** 提供的开源书库资源 [dooshu/shu](https://github.com/dooshu/shu)。正是有了这些丰富的书籍资源，本阅读器才能提供如此完整的阅读体验。
+特别感谢 **[dooshu](https://github.com/doosho)** 提供的开源书库资源 [doosho/shu](https://github.com/doosho/shu)。正是有了这些丰富的书籍资源，本阅读器才能提供如此完整的阅读体验。
 
 书籍资源的版权归原作者所有，本项目仅作为阅读工具使用。
 

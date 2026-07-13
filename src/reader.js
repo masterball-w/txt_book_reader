@@ -240,7 +240,14 @@ function calculateMoyuCharsPerPage() {
   const moyuText = document.getElementById('moyuText');
   if (!moyuText) return 40;
 
+  // 预设 moyuPage 为最宽情况，避免渲染后页码变宽导致 moyuText 实际宽度减小
+  const moyuPageEl = document.getElementById('moyuPage');
+  const savedPageText = moyuPageEl.textContent;
+  moyuPageEl.textContent = '9999/99999';
+
   const containerWidth = moyuText.clientWidth;
+  moyuPageEl.textContent = savedPageText;
+
   if (containerWidth <= 0) {
     const fallback = window.innerWidth - 80;
     if (fallback > 20) {
@@ -249,23 +256,33 @@ function calculateMoyuCharsPerPage() {
     return 40;
   }
 
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+  // 使用 DOM 隐藏 span 测量，替代 canvas measureText
+  // canvas 对 CJK 字符的测量与浏览器实际渲染存在偏差，是吞字的根本原因
   const style = getComputedStyle(moyuText);
-  const fs = style.fontSize || '13px';
-  const ff = style.fontFamily || '"Microsoft YaHei", sans-serif';
-  ctx.font = `${fs} ${ff}`;
+  const tester = document.createElement('span');
+  tester.style.cssText =
+    `position:absolute;visibility:hidden;white-space:nowrap;` +
+    `font-size:${style.fontSize};font-family:${style.fontFamily};` +
+    `font-weight:${style.fontWeight};letter-spacing:${style.letterSpacing};`;
+  document.body.appendChild(tester);
 
-  let width = 0;
-  let count = 0;
-  const maxWidth = containerWidth - 12;
+  // 从文本中间取样测量平均字符宽度
+  // 不能从开头取样：开头是书名/目录，含大量 ASCII 和空格（窄字符），
+  // 会导致算出的 charsPerPage 偏大，正文页 CJK 宽字符溢出被 ellipsis 截断
+  const sampleSize = Math.min(200, moyuFullText.length);
+  const sampleStart = Math.floor((moyuFullText.length - sampleSize) / 2);
+  tester.textContent = moyuFullText.substring(sampleStart, sampleStart + sampleSize);
+  const avgCharWidth = tester.offsetWidth / sampleSize;
 
-  while (count < moyuFullText.length && width < maxWidth) {
-    width += ctx.measureText(moyuFullText[count]).width;
-    if (width < maxWidth) count++;
-  }
+  document.body.removeChild(tester);
 
-  return Math.max(10, count);
+  if (avgCharWidth <= 0) return 40;
+
+  // 94% 安全余量：覆盖不同页面的字符宽度差异 + 亚像素舍入
+  const safeWidth = containerWidth * 0.94;
+  const charsPerPage = Math.floor(safeWidth / avgCharWidth);
+
+  return Math.max(10, charsPerPage);
 }
 
 function computePageBoundaries() {

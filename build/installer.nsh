@@ -1,5 +1,6 @@
 ; ============================================================
 ; 书库阅读器 - NSIS 安装脚本扩展
+; 使用 electron-builder 宏钩子，避免与内置函数冲突
 ; 功能：安装日志、路径验证、权限检查、错误处理
 ; ============================================================
 
@@ -9,7 +10,7 @@
 ; ---- 安装日志变量 ----
 Var LogFile
 
-; ---- 写日志辅助函数 ----
+; ---- 写日志辅助宏 ----
 !macro WriteLog Message
   FileOpen $0 $LogFile a
   FileSeek $0 0 END
@@ -17,12 +18,10 @@ Var LogFile
   FileClose $0
 !macroend
 
-; ---- 安装初始化 ----
-Function .onInit
-  ; 初始化安装日志
+; ---- 初始化（对应 .onInit） ----
+!macro customInit
   StrCpy $LogFile "$TEMP\ShuReader_Install.log"
   
-  ; 创建/覆盖日志文件
   FileOpen $0 $LogFile w
   FileWrite $0 "==============================================$\r$\n"
   FileWrite $0 "ShuReader Install Log$\r$\n"
@@ -46,28 +45,13 @@ Function .onInit
   ${Else}
     !insertmacro WriteLog "[INFO] First installation"
   ${EndIf}
-FunctionEnd
-
-; ---- 安装目录验证 ----
-Function .onVerifyInstDir
-  ; 检查写入权限
-  ClearErrors
-  FileOpen $0 "$INSTDIR\__shureader_test.tmp" w
-  ${If} ${Errors}
-    MessageBox MB_OK|MB_ICONSTOP "安装路径无写入权限：$\r$\n$INSTDIR$\r$\n$\r$\n请选择其他安装路径或以管理员身份运行安装程序。"
-    !insertmacro WriteLog "[ERROR] No write permission: $INSTDIR"
-    Abort
-  ${EndIf}
-  FileClose $0
-  Delete "$INSTDIR\__shureader_test.tmp"
-  !insertmacro WriteLog "[INFO] Install path verified: $INSTDIR"
-FunctionEnd
+!macroend
 
 ; ---- 安装前操作 ----
-Section -PreInstall
+!macro customInstall
   !insertmacro WriteLog "[INFO] Starting file extraction..."
   
-  ; 检查磁盘空间是否足够（至少需要 3GB）
+  ; 检查磁盘空间
   ${DriveSpace} "$INSTDIR" "/D=F /S=M" $1
   !insertmacro WriteLog "[INFO] Available disk space: $1 MB"
   ${If} $1 < 3072
@@ -78,12 +62,10 @@ Section -PreInstall
     continue_install:
       !insertmacro WriteLog "[WARN] Insufficient disk space, user chose to continue"
   ${EndIf}
-SectionEnd
+!macroend
 
 ; ---- 安装后操作 ----
-Section -PostInstall
-  !insertmacro WriteLog "[INFO] File extraction completed"
-  
+!macro customInstallEnd
   ; 验证关键文件
   IfFileExists "$INSTDIR\书库阅读器.exe" verify_main verify_fail
   verify_main:
@@ -113,20 +95,20 @@ Section -PostInstall
     
     ; 复制日志到安装目录
     CopyFiles "$LogFile" "$INSTDIR\install.log"
-SectionEnd
+!macroend
 
 ; ---- 卸载初始化 ----
-Function un.onInit
+!macro customUnInit
   StrCpy $LogFile "$TEMP\ShuReader_Uninstall.log"
   FileOpen $0 $LogFile w
   FileWrite $0 "==============================================$\r$\n"
   FileWrite $0 "ShuReader Uninstall Log$\r$\n"
   FileWrite $0 "==============================================$\r$\n"
   FileClose $0
-FunctionEnd
+!macroend
 
 ; ---- 卸载完成 ----
-Section -UnPostUninstall
+!macro customUnInstall
   !insertmacro WriteLog "[INFO] Uninstallation completed"
   DeleteRegKey HKCU "Software\ShuReader"
-SectionEnd
+!macroend

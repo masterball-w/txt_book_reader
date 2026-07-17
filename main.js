@@ -1,6 +1,25 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, Menu, shell, screen, nativeTheme, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, Menu, shell, screen, nativeTheme, desktopCapturer, dialog, protocol, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
+const formats = require('./lib/formats');
+const { createImportedStore, LOCAL_CATEGORY } = require('./lib/importedStore');
+const { buildLocalBookFilePath } = require('./lib/formats/imageMap');
+const { isImageLine } = require('./lib/formats/htmlToText');
+
+// 必须在 app ready 前注册协议 scheme（privileged）
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'local-book',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true
+    }
+  }
+]);
 
 // GPU cache 修复
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
@@ -39,6 +58,20 @@ function getUserDataDir() {
 function getDataFile() {
   getUserDataDir();
   return DATA_FILE;
+}
+
+const importedStore = createImportedStore(getUserDataDir);
+
+/** 统一 bookid：纯数字保留 number，否则保留字符串（导入书 UUID） */
+function normalizeBookId(bookid) {
+  if (typeof bookid === 'number' && Number.isFinite(bookid)) return bookid;
+  const s = String(bookid);
+  if (/^\d+$/.test(s)) return parseInt(s, 10);
+  return s;
+}
+
+function sameBookId(a, b) {
+  return String(a) === String(b);
 }
 
 // 窗口引用
@@ -91,7 +124,7 @@ function saveData(data) {
 // ============================================================
 // 书籍元数据加载
 // ============================================================
-function loadAllBooks() {
+function loadBuiltinBooks() {
   const categories = ['cn', 'en', 'yi'];
   const allBooks = [];
 
@@ -106,11 +139,13 @@ function loadAllBooks() {
         const { title, author } = parseTitleAuthor(book.title || '');
         allBooks.push({
           category: cat,
-          bookid: parseInt(book.bookid),
+          bookid: parseInt(book.bookid, 10),
           title: title,
           author: author,
           description: book.description || '',
-          rawTitle: book.title || ''
+          rawTitle: book.title || '',
+          format: 'txt',
+          source: 'builtin'
         });
       }
     } catch (e) {
@@ -119,6 +154,18 @@ function loadAllBooks() {
   }
 
   return allBooks;
+}
+
+function loadAllBooks() {
+  return [...loadBuiltinBooks(), ...importedStore.listImportedAsBooks()];
+}
+
+function resolveBookPath(category, bookid) {
+  if (category === LOCAL_CATEGORY) {
+    return importedStore.resolveImportedPath(bookid);
+  }
+  const filePath = path.join(BOOKS_ROOT, category, `${bookid}.txt`);
+  return fs.existsSync(filePath) ? filePath : null;
 }
 
 // 解析标题和作者
@@ -152,18 +199,54 @@ function parseTitleAuthor(rawTitle) {
   return { title: rawTitle.trim(), author: '' };
 }
 
-// 读取书籍内容
+// 读取书籍内容（同步，仅内置 TXT；导入书请用异步版）
 function readBookContent(category, bookid) {
-  const filePath = path.join(BOOKS_ROOT, category, `${bookid}.txt`);
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
+  if (category === LOCAL_CATEGORY) return null;
+  const filePath = resolveBookPath(category, bookid);
+  if (!filePath) return null;
   try {
     return fs.readFileSync(filePath, 'utf-8');
   } catch (e) {
     console.error('读取书籍失败:', e);
     return null;
   }
+}
+
+async function readBookContentAsync(category, bookid) {
+  const filePath = resolveBookPath(category, bookid);
+  if (!filePath) return null;
+
+  try {
+    if (category === LOCAL_CATEGORY) {
+      const entry = importedStore.findImportedBook(bookid);
+      const ext = (entry && entry.format) || path.extname(filePath).replace('.', '');
+      const options = {};
+      if (ext === 'epub' || ext === 'mobi') {
+        options.bookid = String(bookid);
+        options.assetDir = importedStore.ensureAssetDir(bookid);
+      }
+      const result = await formats.extractText(filePath, ext, options);
+      return result.text || null;
+    }
+    // 内置书库仍为 UTF-8 TXT
+    return fs.readFileSync(filePath, 'utf-8');
+  } catch (e) {
+    console.error('读取书籍失败:', e);
+    return null;
+  }
+}
+
+function cleanupBookUserData(key) {
+  const data = loadData();
+  if (data.bookmarks && data.bookmarks[key]) delete data.bookmarks[key];
+  if (data.progress && data.progress[key]) delete data.progress[key];
+  if (data.readingTime && data.readingTime[key]) delete data.readingTime[key];
+  if (Array.isArray(data.bookshelf)) {
+    data.bookshelf = data.bookshelf.filter(
+      b => `${b.category}_${b.bookid}` !== key
+    );
+  }
+  saveData(data);
 }
 
 // ============================================================
@@ -300,9 +383,8 @@ ipcMain.handle('get-books', () => {
 });
 
 // 读取书籍内容
-ipcMain.handle('read-book', (event, { category, bookid }) => {
-  const content = readBookContent(category, bookid);
-  return content;
+ipcMain.handle('read-book', async (event, { category, bookid }) => {
+  return readBookContentAsync(category, normalizeBookId(bookid));
 });
 
 // 搜索书籍
@@ -345,7 +427,7 @@ ipcMain.handle('search-books', (event, { type, keyword }) => {
 });
 
 // 内容搜索
-ipcMain.handle('search-content', (event, { keyword, category }) => {
+ipcMain.handle('search-content', async (event, { keyword, category }) => {
   const allBooks = loadAllBooks();
   const results = [];
   const kw = keyword.trim();
@@ -356,19 +438,21 @@ ipcMain.handle('search-content', (event, { keyword, category }) => {
     allBooks.filter(b => b.category === category) : allBooks;
 
   for (const book of booksToSearch) {
-    const content = readBookContent(book.category, book.bookid);
+    const content = await readBookContentAsync(book.category, book.bookid);
     if (!content) continue;
 
     const lines = content.split('\n');
     const snippets = [];
 
     for (let i = 0; i < lines.length; i++) {
+      if (isImageLine(lines[i])) continue;
       if (lines[i].includes(kw)) {
         const start = Math.max(0, i - 1);
         const end = Math.min(lines.length, i + 2);
+        const snippetLines = lines.slice(start, end).filter(l => !isImageLine(l));
         snippets.push({
           line: i,
-          text: lines.slice(start, end).join('\n').trim()
+          text: snippetLines.join('\n').trim()
         });
         if (snippets.length >= 5) break; // 每本书最多5个匹配
       }
@@ -384,18 +468,18 @@ ipcMain.handle('search-content', (event, { keyword, category }) => {
 
 // 打开阅读器
 ipcMain.handle('open-reader', (event, { category, bookid, page, mode }) => {
-  const state = { category, bookid, page: page || 0 };
+  const state = { category, bookid: normalizeBookId(bookid), page: page || 0 };
   createReaderWindow(mode || 'window', state);
 
   // 添加到书架
-  addToShelf(category, bookid, page || 0);
+  addToShelf(category, state.bookid, page || 0);
 
   return { success: true };
 });
 
 // 切换阅读模式
 ipcMain.handle('switch-mode', (event, { mode, category, bookid, page }) => {
-  const state = { category, bookid, page: page || 0 };
+  const state = { category, bookid: normalizeBookId(bookid), page: page || 0 };
 
   // 关闭当前阅读窗口
   if (readerWindow) {
@@ -491,8 +575,9 @@ ipcMain.handle('get-progress', (event, { category, bookid }) => {
 // ---- 书架管理 ----
 function addToShelf(category, bookid, page) {
   const data = loadData();
+  const bid = normalizeBookId(bookid);
   const existing = data.bookshelf.findIndex(
-    b => b.category === category && b.bookid === bookid
+    b => b.category === category && sameBookId(b.bookid, bid)
   );
 
   if (existing >= 0) {
@@ -501,7 +586,7 @@ function addToShelf(category, bookid, page) {
   } else {
     data.bookshelf.push({
       category,
-      bookid,
+      bookid: bid,
       page,
       lastRead: Date.now(),
       addedAt: Date.now()
@@ -541,11 +626,69 @@ ipcMain.handle('get-bookshelf', () => {
 
 ipcMain.handle('remove-from-shelf', (event, { category, bookid }) => {
   const data = loadData();
+  const bid = normalizeBookId(bookid);
   data.bookshelf = data.bookshelf.filter(
-    b => !(b.category === category && b.bookid === bookid)
+    b => !(b.category === category && sameBookId(b.bookid, bid))
   );
   saveData(data);
   return { success: true };
+});
+
+// ---- 导入书籍 ----
+ipcMain.handle('get-supported-formats', () => {
+  return {
+    supported: formats.supportedExtensions(),
+    todo: formats.allRegisteredExtensions().filter(ext => formats.isTodo(ext))
+  };
+});
+
+ipcMain.handle('import-books', async () => {
+  const supported = formats.supportedExtensions();
+  const todo = formats.allRegisteredExtensions().filter(ext => formats.isTodo(ext));
+  const filters = [
+    {
+      name: '支持的电子书',
+      extensions: supported
+    },
+    {
+      name: '所有文件',
+      extensions: ['*']
+    }
+  ];
+  // 也列出 TODO 扩展，便于用户选中后得到明确提示
+  if (todo.length) {
+    filters.splice(1, 0, {
+      name: '其他格式（暂未支持）',
+      extensions: todo
+    });
+  }
+
+  const result = await dialog.showOpenDialog(mainWindow || undefined, {
+    title: '导入书籍',
+    properties: ['openFile', 'multiSelections'],
+    filters
+  });
+
+  if (result.canceled || !result.filePaths.length) {
+    return { imported: [], errors: [], canceled: true };
+  }
+
+  return importedStore.importBookFiles(result.filePaths);
+});
+
+ipcMain.handle('delete-imported-book', (event, { bookid }) => {
+  return importedStore.deleteImportedBook(bookid, cleanupBookUserData);
+});
+
+ipcMain.handle('get-imported-dir', () => {
+  const dir = importedStore.ensureImportedDirs();
+  return { path: dir };
+});
+
+ipcMain.handle('open-imported-dir', async () => {
+  const dir = importedStore.ensureImportedDirs();
+  await shell.openPath(dir);
+  return { success: true, path: dir };
 });
 
 // ---- 阅读时长 ----
@@ -723,6 +866,24 @@ ipcMain.handle('capture-screen', async () => {
 // 全局快捷键
 // ============================================================
 app.whenReady().then(() => {
+  // 注册 local-book 协议：local-book://{bookid}/{filename}
+  protocol.handle('local-book', (request) => {
+    try {
+      const url = new URL(request.url);
+      const bookid = decodeURIComponent(url.hostname || '');
+      const filename = decodeURIComponent((url.pathname || '').replace(/^\//, ''));
+      const assetsRoot = importedStore.getAssetsRoot();
+      const filePath = buildLocalBookFilePath(assetsRoot, bookid, filename);
+      if (!filePath || !fs.existsSync(filePath)) {
+        return new Response('Not Found', { status: 404 });
+      }
+      return net.fetch(pathToFileURL(filePath).href);
+    } catch (e) {
+      console.error('local-book protocol error:', e);
+      return new Response('Bad Request', { status: 400 });
+    }
+  });
+
   // 初始化原生主题
   const data = loadData();
   if (data.theme) {

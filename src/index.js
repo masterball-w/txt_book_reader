@@ -6,14 +6,28 @@ let currentSearchType = 'fuzzy';
 let bookshelf = [];
 let allReadingTime = {};
 
+function parseBookId(raw) {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  const s = String(raw);
+  if (/^\d+$/.test(s)) return parseInt(s, 10);
+  return s;
+}
+
+function shortBookId(bookid) {
+  const s = String(bookid);
+  if (s.length > 12) return s.slice(0, 8) + '…';
+  return s;
+}
+
 // ===== 初始化 =====
 async function init() {
   allBooks = await window.api.getBooks();
   const counts = await window.api.getBookCount();
 
   // 更新计数
-  for (const cat of ['cn', 'en', 'yi']) {
-    document.getElementById(`count-${cat}`).textContent = counts[cat] || 0;
+  for (const cat of ['cn', 'en', 'yi', 'local']) {
+    const el = document.getElementById(`count-${cat}`);
+    if (el) el.textContent = counts[cat] || 0;
   }
 
   // 加载书架
@@ -31,6 +45,23 @@ async function init() {
   bindEvents();
 }
 
+async function refreshBooks() {
+  allBooks = await window.api.getBooks();
+  const counts = await window.api.getBookCount();
+  for (const cat of ['cn', 'en', 'yi', 'local']) {
+    const el = document.getElementById(`count-${cat}`);
+    if (el) el.textContent = counts[cat] || 0;
+  }
+  bookshelf = await window.api.getBookshelf();
+  document.getElementById('count-shelf').textContent = bookshelf.length;
+}
+
+function updateImportToolbar(view) {
+  const toolbar = document.getElementById('importToolbar');
+  if (!toolbar) return;
+  toolbar.style.display = view === 'local' ? 'flex' : 'none';
+}
+
 // ===== 事件绑定 =====
 function bindEvents() {
   // 侧边栏导航
@@ -43,8 +74,10 @@ function bindEvents() {
 
       // 隐藏搜索结果
       document.getElementById('searchResults').style.display = 'none';
+      updateImportToolbar(view);
 
       if (view === 'shelf') {
+        document.getElementById('importToolbar').style.display = 'none';
         renderShelf();
       } else {
         document.getElementById('shelfView').style.display = 'none';
@@ -80,36 +113,111 @@ function bindEvents() {
   document.getElementById('searchInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doSearch();
   });
+
+  const importBtn = document.getElementById('importBtn');
+  if (importBtn) {
+    importBtn.addEventListener('click', doImportBooks);
+  }
+  const openDirBtn = document.getElementById('openImportDirBtn');
+  if (openDirBtn) {
+    openDirBtn.addEventListener('click', async () => {
+      await window.api.openImportedDir();
+    });
+  }
+}
+
+async function doImportBooks() {
+  const loading = document.getElementById('loading');
+  const loadingText = loading.querySelector('p');
+  const prevText = loadingText.textContent;
+  loadingText.textContent = '正在导入...';
+  loading.style.display = 'flex';
+
+  try {
+    const result = await window.api.importBooks();
+    if (result.canceled) return;
+
+    await refreshBooks();
+    if (currentView === 'local') {
+      renderBookGrid('local');
+    }
+
+    const ok = (result.imported || []).length;
+    const err = (result.errors || []).length;
+    let msg = `成功导入 ${ok} 本`;
+    if (err > 0) {
+      const details = result.errors.map(e => `${e.path}: ${e.error}`).join('\n');
+      msg += `\n失败 ${err} 本:\n${details}`;
+    }
+    alert(msg);
+  } catch (e) {
+    alert('导入失败: ' + (e.message || e));
+  } finally {
+    loading.style.display = 'none';
+    loadingText.textContent = prevText;
+  }
 }
 
 // ===== 渲染书籍网格 =====
 function renderBookGrid(category) {
   const grid = document.getElementById('bookGrid');
   const books = allBooks.filter(b => b.category === category);
+  updateImportToolbar(category);
 
   if (books.length === 0) {
     grid.style.display = 'none';
     document.getElementById('emptyState').style.display = 'flex';
+    const emptyP = document.getElementById('emptyState').querySelector('p');
+    if (category === 'local') {
+      emptyP.textContent = '还没有导入书籍，点击上方「导入书籍」添加 TXT / EPUB / MOBI';
+    } else {
+      emptyP.textContent = '暂无数据';
+    }
     return;
   }
 
   document.getElementById('emptyState').style.display = 'none';
   grid.style.display = 'grid';
 
-  grid.innerHTML = books.map(book => `
-    <div class="book-card" data-category="${book.category}" data-bookid="${book.bookid}">
+  grid.innerHTML = books.map(book => {
+    const formatBadge = book.format
+      ? `<span class="format-badge">${escapeHtml(String(book.format).toUpperCase())}</span>`
+      : '';
+    const deleteBtn = category === 'local'
+      ? `<div class="book-card-actions"><button class="book-card-delete" data-bookid="${escapeHtml(String(book.bookid))}">删除</button></div>`
+      : '';
+    return `
+    <div class="book-card" data-category="${book.category}" data-bookid="${escapeHtml(String(book.bookid))}">
       <div class="book-card-title">${escapeHtml(book.title)}</div>
       ${book.author ? `<div class="book-card-author">${escapeHtml(book.author)}</div>` : ''}
-      <div class="book-card-id">#${book.bookid} · ${categoryLabel(book.category)}</div>
+      <div class="book-card-id">${formatBadge} #${escapeHtml(shortBookId(book.bookid))} · ${categoryLabel(book.category)}</div>
+      ${deleteBtn}
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   // 绑定点击事件
   grid.querySelectorAll('.book-card').forEach(card => {
-    card.addEventListener('click', () => {
+    card.addEventListener('click', (e) => {
+      if (e.target.classList.contains('book-card-delete')) return;
       const cat = card.dataset.category;
-      const bid = parseInt(card.dataset.bookid);
+      const bid = parseBookId(card.dataset.bookid);
       showModeSelector(cat, bid);
+    });
+  });
+
+  grid.querySelectorAll('.book-card-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const bid = parseBookId(btn.dataset.bookid);
+      if (!confirm('确定删除这本导入的书？文件与阅读进度将一并清除。')) return;
+      const result = await window.api.deleteImportedBook(bid);
+      if (!result.success) {
+        alert(result.error || '删除失败');
+        return;
+      }
+      await refreshBooks();
+      renderBookGrid('local');
     });
   });
 }
@@ -124,6 +232,7 @@ async function renderShelf() {
 
   grid.style.display = 'none';
   document.getElementById('searchResults').style.display = 'none';
+  document.getElementById('importToolbar').style.display = 'none';
 
   if (bookshelf.length === 0) {
     shelfView.style.display = 'flex';
@@ -143,17 +252,17 @@ async function renderShelf() {
     const time = formatReadingTime(allReadingTime[`${item.category}_${item.bookid}`] || 0);
     const lastRead = formatTime(item.lastRead);
     return `
-      <div class="shelf-card" data-category="${item.category}" data-bookid="${item.bookid}">
+      <div class="shelf-card" data-category="${item.category}" data-bookid="${escapeHtml(String(item.bookid))}">
         <div class="shelf-card-info">
           <div class="shelf-card-title">${escapeHtml(item.title)}</div>
           <div class="shelf-card-meta">
-            <span>${categoryLabel(item.category)} #${item.bookid}</span>
+            <span>${categoryLabel(item.category)} #${escapeHtml(shortBookId(item.bookid))}</span>
             ${item.author ? `<span>作者: ${escapeHtml(item.author)}</span>` : ''}
             <span>最后阅读: ${lastRead}</span>
           </div>
         </div>
         <div class="shelf-card-time">${time}</div>
-        <button class="shelf-card-remove" data-category="${item.category}" data-bookid="${item.bookid}">移除</button>
+        <button class="shelf-card-remove" data-category="${item.category}" data-bookid="${escapeHtml(String(item.bookid))}">移除</button>
       </div>
     `;
   }).join('');
@@ -163,7 +272,7 @@ async function renderShelf() {
     card.addEventListener('click', (e) => {
       if (e.target.classList.contains('shelf-card-remove')) return;
       const cat = card.dataset.category;
-      const bid = parseInt(card.dataset.bookid);
+      const bid = parseBookId(card.dataset.bookid);
       showModeSelector(cat, bid);
     });
   });
@@ -173,7 +282,7 @@ async function renderShelf() {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const cat = btn.dataset.category;
-      const bid = parseInt(btn.dataset.bookid);
+      const bid = parseBookId(btn.dataset.bookid);
       await window.api.removeFromShelf(cat, bid);
       renderShelf();
     });
@@ -196,6 +305,7 @@ async function doSearch() {
   shelfView.style.display = 'none';
   resultsDiv.style.display = 'none';
   emptyState.style.display = 'none';
+  document.getElementById('importToolbar').style.display = 'none';
 
   let results = [];
   if (currentSearchType === 'content') {
@@ -217,7 +327,7 @@ async function doSearch() {
     results.map(book => {
       if (currentSearchType === 'content') {
         return `
-          <div class="search-result-item" data-category="${book.category}" data-bookid="${book.bookid}">
+          <div class="search-result-item" data-category="${book.category}" data-bookid="${escapeHtml(String(book.bookid))}">
             <div class="search-result-header">
               <span class="search-result-title">${escapeHtml(book.title)}</span>
               <span class="search-result-badge">${book.matchCount}处匹配</span>
@@ -230,10 +340,10 @@ async function doSearch() {
         `;
       }
       return `
-        <div class="search-result-item" data-category="${book.category}" data-bookid="${book.bookid}">
+        <div class="search-result-item" data-category="${book.category}" data-bookid="${escapeHtml(String(book.bookid))}">
           <div class="search-result-header">
             <span class="search-result-title">${highlightKeyword(escapeHtml(book.title), keyword)}</span>
-            <span class="search-result-badge">${categoryLabel(book.category)} #${book.bookid}</span>
+            <span class="search-result-badge">${categoryLabel(book.category)} #${escapeHtml(shortBookId(book.bookid))}</span>
           </div>
           ${book.author ? `<div class="search-result-author">作者: ${highlightKeyword(escapeHtml(book.author), keyword)}</div>` : ''}
         </div>
@@ -244,7 +354,7 @@ async function doSearch() {
   resultsDiv.querySelectorAll('.search-result-item').forEach(item => {
     item.addEventListener('click', () => {
       const cat = item.dataset.category;
-      const bid = parseInt(item.dataset.bookid);
+      const bid = parseBookId(item.dataset.bookid);
       showModeSelector(cat, bid);
     });
   });
@@ -330,7 +440,7 @@ function highlightKeyword(text, keyword) {
 }
 
 function categoryLabel(cat) {
-  const labels = { cn: '中文', en: '英文', yi: '译文' };
+  const labels = { cn: '中文', en: '英文', yi: '译文', local: '导入' };
   return labels[cat] || cat;
 }
 

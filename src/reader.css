@@ -130,6 +130,26 @@ body {
   min-height: 100%;
 }
 
+.reader-img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  object-fit: contain;
+}
+
+/* 加载失败时不显示成一条横线 */
+.reader-img[style*="display: none"],
+.reader-img:not([src]) {
+  display: none !important;
+  margin: 0;
+  border: none;
+  height: 0;
+}
+
 /* 底部状态栏 */
 .reader-footer {
   display: flex;

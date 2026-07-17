@@ -10,6 +10,13 @@ contextBridge.exposeInMainWorld('api', {
   searchBooks: (type, keyword) => ipcRenderer.invoke('search-books', { type, keyword }),
   searchContent: (keyword, category) => ipcRenderer.invoke('search-content', { keyword, category }),
 
+  // 导入
+  getSupportedFormats: () => ipcRenderer.invoke('get-supported-formats'),
+  importBooks: () => ipcRenderer.invoke('import-books'),
+  deleteImportedBook: (bookid) => ipcRenderer.invoke('delete-imported-book', { bookid }),
+  getImportedDir: () => ipcRenderer.invoke('get-imported-dir'),
+  openImportedDir: () => ipcRenderer.invoke('open-imported-dir'),
+
   // 阅读器
   openReader: (category, bookid, page, mode) =>
     ipcRenderer.invoke('open-reader', { category, bookid, page, mode }),

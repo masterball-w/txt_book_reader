@@ -1,13 +1,14 @@
 {
   "name": "shu-reader",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "书库阅读器 - 支持全屏/窗口/摸鱼三种阅读模式",
   "main": "main.js",
   "scripts": {
     "start": "node launch.js",
     "dev": "node launch.js --dev",
     "build": "electron-builder --win --x64",
-    "build:dir": "electron-builder --win --x64 --dir"
+    "build:dir": "electron-builder --win --x64 --dir",
+    "build:launcher": "tools\\launcher\\build-launcher.bat"
   },
   "author": "shu-reader",
   "license": "MIT",
@@ -26,8 +27,14 @@
     "files": [
       "main.js",
       "preload.js",
+      "launch.js",
+      "lib/**/*",
       "src/**/*",
-      "package.json"
+      "package.json",
+      "!ShuReader.exe",
+      "!tools/**/*",
+      "!scripts/**/*",
+      "!start.bat"
     ],
     "extraResources": [
       {
@@ -84,5 +91,11 @@
       "repo": "txt_book_reader",
       "releaseType": "release"
     }
+  },
+  "dependencies": {
+    "@lingo-reader/epub-parser": "^0.4.6",
+    "@lingo-reader/mobi-parser": "^0.4.6",
+    "iconv-lite": "^0.7.3",
+    "jszip": "^3.10.1"
   }
 }

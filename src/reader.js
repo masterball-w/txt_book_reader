@@ -4,8 +4,9 @@
 const urlParams = new URLSearchParams(window.location.search);
 const MODE = urlParams.get('mode') || 'window';
 const CATEGORY = urlParams.get('category') || 'cn';
-const BOOKID = parseInt(urlParams.get('bookid') || '1');
-const START_PAGE = parseInt(urlParams.get('page') || '0');
+const BOOKID_RAW = urlParams.get('bookid') || '1';
+const BOOKID = /^\d+$/.test(BOOKID_RAW) ? parseInt(BOOKID_RAW, 10) : BOOKID_RAW;
+const START_PAGE = parseInt(urlParams.get('page') || '0', 10);
 
 // 状态
 let bookContent = '';
@@ -38,6 +39,40 @@ let pageStartLines = [];    // pageStartLines[i] = 第i页的起始行索引
 // 匹配：卷N（无"第"前缀，如聊斋志异的"卷一""卷二"）
 // 匹配：Chapter N（英文）
 const CHAPTER_REGEX = /^第[\d一二三四五六七八九十百千万零两壹贰叁肆伍陆柒捌玖拾佰仟]+[章节回卷部篇]\s*.*|^卷[\d一二三四五六七八九十百千万零两壹贰叁肆伍陆柒捌玖拾佰仟]+\s*.*|^Chapter\s+[\dIVXLCDMivxlcdm]+.*/i;
+
+// 图片占位行：@@IMG:local-book://...@@
+const IMG_LINE_RE = /^@@IMG:(.+?)@@$/;
+
+function isImageLine(line) {
+  return IMG_LINE_RE.test(String(line || '').trim());
+}
+
+function parseImageLine(line) {
+  const m = String(line || '').trim().match(IMG_LINE_RE);
+  return m ? m[1] : null;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** 仅允许 data:image 或 local-book:// 图片 URL */
+function sanitizeImageSrc(src) {
+  if (!src || typeof src !== 'string') return null;
+  const s = src.trim();
+  if (/^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\r\n]+$/i.test(s)) {
+    return s.replace(/[\r\n\s]/g, '');
+  }
+  if (/^local-book:\/\/[^\/\s]+\/\S+$/i.test(s) && !/[<>"']/.test(s)) {
+    return s;
+  }
+  return null;
+}
 
 // 主题预设
 const THEME_PRESETS = {
@@ -105,8 +140,11 @@ async function init() {
   // 加载书籍内容
   bookContent = await window.api.readBook(CATEGORY, BOOKID);
   if (!bookContent) {
-    document.getElementById('readerText').textContent = '无法加载书籍内容';
-    document.getElementById('moyuText').textContent = '无法加载书籍内容';
+    const errMsg = CATEGORY === 'local'
+      ? '无法加载导入书籍（格式解析失败或文件已删除）'
+      : '无法加载书籍内容';
+    document.getElementById('readerText').textContent = errMsg;
+    document.getElementById('moyuText').textContent = errMsg;
     return;
   }
 
@@ -224,14 +262,25 @@ function goToLineIndex(lineIndex, targetChapterIdx) {
 
 // ===== 预计算摸鱼全文 =====
 function computeMoyuFullText() {
-  const cleanedLines = bookLines.map(line => line.replace(/\s+/g, ' ').trim());
-  moyuFullText = cleanedLines.join(' ');
+  // 摸鱼模式忽略图片占位行
+  const cleanedLines = bookLines.map(line => {
+    if (isImageLine(line)) return '';
+    return line.replace(/\s+/g, ' ').trim();
+  });
+  moyuFullText = cleanedLines.filter(Boolean).join(' ');
 
   moyuLineOffsets = [];
   let offset = 0;
   for (let i = 0; i < bookLines.length; i++) {
     moyuLineOffsets[i] = offset;
-    offset += cleanedLines[i].length + 1;
+    if (isImageLine(bookLines[i])) {
+      // 图片行不占用摸鱼文本，偏移保持不变
+      continue;
+    }
+    const cleaned = cleanedLines[i];
+    if (cleaned) {
+      offset += cleaned.length + 1;
+    }
   }
 }
 
@@ -350,7 +399,24 @@ function renderReaderPage() {
   const lines = bookLines.slice(startIdx, endIdx);
 
   readerText.style.fontSize = fontSize + 'px';
-  readerText.textContent = lines.join('\n');
+
+  const hasImages = lines.some(isImageLine);
+  if (hasImages) {
+    const html = lines.map(line => {
+      if (isImageLine(line)) {
+        const rawSrc = parseImageLine(line);
+        const src = sanitizeImageSrc(rawSrc);
+        if (!src) return '';
+        // data: URL 不含需要转义的 HTML 特殊字符；仍做引号防护
+        const safeSrc = src.replace(/"/g, '');
+        return `<img class="reader-img" src="${safeSrc}" alt="" loading="lazy" onerror="this.style.display='none'" />`;
+      }
+      return escapeHtml(line);
+    }).join('\n');
+    readerText.innerHTML = html;
+  } else {
+    readerText.textContent = lines.join('\n');
+  }
 
   document.getElementById('pageInfo').textContent = `${currentPage + 1} / ${totalPages}`;
 }
@@ -438,6 +504,7 @@ function parseChapters() {
     const allMatches = [];
     for (let i = 0; i < bookLines.length; i++) {
       const line = bookLines[i].trim();
+      if (isImageLine(line)) continue;
       if (CHAPTER_REGEX.test(line) && line.length <= 100) {
         allMatches.push({ title: line, lineIndex: i });
       }
@@ -452,6 +519,7 @@ function parseChapters() {
   const seen = new Set();
   for (let i = 1; i < mainTextStart; i++) {
     const title = bookLines[i].trim();
+    if (isImageLine(title)) continue;
     if (title && !title.includes('doosho.com') && !seen.has(title)) {
       seen.add(title);
       tocEntries.push(title);

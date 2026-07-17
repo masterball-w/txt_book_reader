@@ -40,17 +40,23 @@
       {
         "from": "shu/cn",
         "to": "shu/cn",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "shu/en",
         "to": "shu/en",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "shu/yi",
         "to": "shu/yi",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "shu/README.md",
@@ -61,7 +67,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "ShuReader-Setup-${version}-${arch}.exe"
@@ -71,7 +79,10 @@
       "perMachine": false,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
-      "installerLanguages": ["zh_CN", "en_US"],
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
       "language": "2052",
       "displayLanguageSelector": false,
       "createDesktopShortcut": true,

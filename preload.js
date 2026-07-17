@@ -52,10 +52,10 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('get-reading-time', { category, bookid }),
   getAllReadingTime: () => ipcRenderer.invoke('get-all-reading-time'),
 
-  // 摸鱼窗口拖动
+  // 墨域窗口拖动
   moyuDrag: (dx, dy) => ipcRenderer.send('moyu-drag', { dx, dy }),
 
-  // 摸鱼模式原生右键菜单（传入书签和章节数据用于构建子菜单）
+  // 墨域模式原生右键菜单（传入书签和章节数据用于构建子菜单）
   showMoyuMenu: (data, callback) => {
     ipcRenderer.send('moyu-context-menu', data);
     ipcRenderer.once('moyu-menu-action', (event, action) => callback(action));

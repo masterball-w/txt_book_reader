@@ -361,7 +361,7 @@ body {
   color: #fff;
 }
 
-/* ===== 摸鱼模式 ===== */
+/* ===== 墨域模式 ===== */
 body.mode-moyu {
   background: transparent !important;
   overflow: hidden;

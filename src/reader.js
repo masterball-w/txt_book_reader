@@ -20,11 +20,11 @@ let readingTimeSeconds = 0;
 let readingTimer = null;
 let lastSaveTime = 0;
 
-// 摸鱼模式分页大小（动态计算）
+// 墨域模式分页大小（动态计算）
 let moyuCharsPerPage = 40;
 let moyuPageContent = [];
 let moyuCurrentPage = 0;
-// 摸鱼模式拼接全文（预计算，避免重复拼接）
+// 墨域模式拼接全文（预计算，避免重复拼接）
 let moyuFullText = '';
 
 // 章节列表
@@ -151,7 +151,7 @@ async function init() {
   // 按行分割
   bookLines = bookContent.split('\n').filter(line => line.trim() !== '');
 
-  // 预计算摸鱼模式拼接全文和行偏移
+  // 预计算墨域模式拼接全文和行偏移
   computeMoyuFullText();
 
   // 解析章节
@@ -198,7 +198,7 @@ async function init() {
   currentTheme = await window.api.getTheme();
   applyTheme(currentTheme);
 
-  // 计算分页（摸鱼模式需要延迟等布局完成）
+  // 计算分页（墨域模式需要延迟等布局完成）
   if (MODE === 'moyu') {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -260,9 +260,9 @@ function goToLineIndex(lineIndex, targetChapterIdx) {
   highlightCurrentChapter(targetChapterIdx);
 }
 
-// ===== 预计算摸鱼全文 =====
+// ===== 预计算墨域全文 =====
 function computeMoyuFullText() {
-  // 摸鱼模式忽略图片占位行
+  // 墨域模式忽略图片占位行
   const cleanedLines = bookLines.map(line => {
     if (isImageLine(line)) return '';
     return line.replace(/\s+/g, ' ').trim();
@@ -274,7 +274,7 @@ function computeMoyuFullText() {
   for (let i = 0; i < bookLines.length; i++) {
     moyuLineOffsets[i] = offset;
     if (isImageLine(bookLines[i])) {
-      // 图片行不占用摸鱼文本，偏移保持不变
+      // 图片行不占用墨域文本，偏移保持不变
       continue;
     }
     const cleaned = cleanedLines[i];
@@ -982,7 +982,7 @@ function bindEvents() {
     setupMoyuDrag();
   }
 
-  // 摸鱼模式：窗口大小变化时重新计算分页
+  // 墨域模式：窗口大小变化时重新计算分页
   if (MODE === 'moyu') {
     let resizeTimer = null;
     window.addEventListener('resize', () => {
@@ -1080,7 +1080,7 @@ function handleContextAction(action) {
       saveBookmark();
       break;
     case 'bookmarkList':
-      // 仅窗口/全屏模式会触发（摸鱼模式用原生子菜单）
+      // 仅窗口/全屏模式会触发（墨域模式用原生子菜单）
       document.getElementById('bookmarkPanel').classList.toggle('show');
       break;
     case 'mode-window':
@@ -1105,7 +1105,7 @@ function handleContextAction(action) {
       nextChapter();
       break;
     case 'chapterList':
-      // 仅窗口/全屏模式会触发（摸鱼模式用原生子菜单）
+      // 仅窗口/全屏模式会触发（墨域模式用原生子菜单）
       document.getElementById('chapterPanel').classList.toggle('show');
       break;
     case 'hide':
@@ -1114,7 +1114,7 @@ function handleContextAction(action) {
   }
 }
 
-// ===== 摸鱼模式拖动 =====
+// ===== 墨域模式拖动 =====
 function setupMoyuDrag() {
   const container = document.getElementById('moyuContainer');
   let isDragging = false;
@@ -1170,7 +1170,7 @@ function applyTheme(theme) {
 
   updateSettingsPanel(theme);
 
-  // 主题变化后，摸鱼模式需要重新计算分页
+  // 主题变化后，墨域模式需要重新计算分页
   if (MODE === 'moyu' && bookLines.length > 0 && moyuFullText) {
     const savedLine = getCurrentLineIndex();
     calculatePages();

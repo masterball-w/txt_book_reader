@@ -288,7 +288,7 @@ function createReaderWindow(mode, state) {
   currentReadState = { ...state, mode };
 
   if (mode === 'moyu') {
-    // 摸鱼模式 - 无边框长条
+    // 墨域模式 - 无边框长条
     createMoyuWindow(state);
     return;
   }
@@ -495,7 +495,7 @@ ipcMain.handle('switch-mode', (event, { mode, category, bookid, page }) => {
   return { success: true };
 });
 
-// 隐藏摸鱼窗口
+// 隐藏墨域窗口
 ipcMain.handle('hide-moyu', () => {
   if (moyuWindow) {
     moyuWindow.hide();
@@ -503,7 +503,7 @@ ipcMain.handle('hide-moyu', () => {
   return { success: true };
 });
 
-// 显示摸鱼窗口
+// 显示墨域窗口
 ipcMain.handle('show-moyu', () => {
   if (moyuWindow) {
     moyuWindow.show();
@@ -712,7 +712,7 @@ ipcMain.handle('get-all-reading-time', () => {
   return data.readingTime || {};
 });
 
-// ---- 摸鱼窗口拖动 ----
+// ---- 墨域窗口拖动 ----
 ipcMain.on('moyu-drag', (event, { dx, dy }) => {
   if (moyuWindow) {
     const [x, y] = moyuWindow.getPosition();
@@ -720,7 +720,7 @@ ipcMain.on('moyu-drag', (event, { dx, dy }) => {
   }
 });
 
-// ---- 摸鱼模式原生右键菜单 ----
+// ---- 墨域模式原生右键菜单 ----
 ipcMain.on('moyu-context-menu', (event, data) => {
   const bookmarks = (data && data.bookmarks) || [];
   const chapters = (data && data.chapters) || [];
@@ -761,7 +761,7 @@ ipcMain.on('moyu-context-menu', (event, data) => {
 });
 
 function sendMoyuAction(event, action) {
-  // 向摸鱼窗口的渲染进程发送动作
+  // 向墨域窗口的渲染进程发送动作
   if (moyuWindow) {
     moyuWindow.webContents.send('moyu-menu-action', action);
   }
@@ -898,7 +898,7 @@ app.whenReady().then(() => {
 
   createMainWindow();
 
-  // 全局快捷键：Ctrl+` 切换摸鱼窗口显示/隐藏
+  // 全局快捷键：Ctrl+` 切换墨域窗口显示/隐藏
   globalShortcut.register('CommandOrControl+`', () => {
     if (moyuWindow) {
       if (moyuWindow.isVisible()) {
@@ -910,7 +910,7 @@ app.whenReady().then(() => {
     }
   });
 
-  // Ctrl+Shift+M 快速打开摸鱼模式（从主窗口）
+  // Ctrl+Shift+M 快速打开墨域模式（从主窗口）
   globalShortcut.register('CommandOrControl+Shift+M', () => {
     if (mainWindow && !moyuWindow && currentReadState) {
       createMoyuWindow(currentReadState);

@@ -6,7 +6,7 @@
 
 <p align="center">
   An Electron desktop ebook reader<br/>
-  Built-in <a href="https://github.com/doosho/shu">doosho/shu</a> library · TXT / EPUB / MOBI · Window / Fullscreen / Stealth modes
+  Built-in <a href="https://github.com/doosho/shu">doosho/shu</a> library · TXT / EPUB / MOBI · Window / Fullscreen / Ink Domain modes
 </p>
 
 <p align="center">
@@ -37,7 +37,7 @@
 
 | | |
 |:---|:---|
-| **Three reading modes** | Window · Fullscreen · Stealth (always-on-top bar, `` Ctrl+` `` to hide) |
+| **Three reading modes** | Window · Fullscreen · Ink Domain (always-on-top bar, `` Ctrl+` `` to hide) |
 | **Built-in library** | cn / en / yi, 2200+ TXT books ([doosho/shu](https://github.com/doosho/shu)) |
 | **Import** | TXT / EPUB / MOBI; embedded images in window & fullscreen for EPUB/MOBI |
 | **Reading tools** | Bookmarks, shelf, chapter jump, full-text search, themes & screen color picker |
@@ -50,11 +50,19 @@
 
 Newest first.
 
+### 2026-07-17 · v1.3.0
+
+- **Rename**: reading mode "Moyu/Stealth" is now **Ink Domain (墨域)** — a homophonic, literary branding; UI labels and icons updated (internal mode id remains `moyu` for compatibility)
+
+Installer: [`ShuReader-Setup-1.3.0-x64.exe`](https://github.com/masterball-w/txt_book_reader/releases/tag/v1.3.0)
+
+---
+
 ### 2026-07-17 · v1.2.0
 
 - **Import**: sidebar Import for TXT / EPUB / MOBI → `%APPDATA%/.../imported-books/`
 - **Format adapters**: pluggable formats; PDF / AZW3 / FB2 still TODO
-- **EPUB/MOBI images**: shown in window/fullscreen; stealth mode stays text-only
+- **EPUB/MOBI images**: shown in window/fullscreen; Ink Domain mode stays text-only
 - **Local launcher**: `ShuReader.exe` replaces `start.bat` (dev only, not packaged)
 - **Build isolation**: `npm run build` vs optional `build:launcher`
 
@@ -66,7 +74,7 @@ Installer: [`ShuReader-Setup-1.2.0-x64.exe`](https://github.com/masterball-w/txt
 
 ### 2026-07-13 · v1.1.0
 
-- Stealth mode text clipping fix (DOM measure + mid-text sampling + page-number width)
+- Ink Domain mode text clipping fix (DOM measure + mid-text sampling + page-number width)
 - Chapter-boundary paging; stronger TOC matching
 - NSIS installer: custom path, permission checks, install log
 - README screenshots
@@ -91,9 +99,9 @@ Installer: [`ShuReader-Setup-1.1.0-x64.exe`](https://github.com/masterball-w/txt
 
 - **Window** — standard window with toolbar
 - **Fullscreen** — immersive; toolbar on hover
-- **Stealth** — transparent always-on-top strip; `` Ctrl+` `` to toggle
+- **Ink Domain** (墨域) — transparent always-on-top strip; `` Ctrl+` `` to toggle
 
-![Stealth mode](docs/screenshots/摸鱼模式的阅读界面.png)
+![Ink Domain mode](docs/screenshots/摸鱼模式的阅读界面.png)
 
 ### Search / bookmarks / themes
 
@@ -108,9 +116,9 @@ Installer: [`ShuReader-Setup-1.1.0-x64.exe`](https://github.com/masterball-w/txt
 | `←` / `PageUp` | Previous page | All |
 | `→` / `PageDown` / `Space` | Next page | All |
 | `Ctrl + B` | Bookmark | All |
-| `` Ctrl + ` `` | Show/hide stealth window | Global |
-| `Ctrl + Shift + M` | Open stealth mode | Global |
-| `H` | Hide stealth window | Stealth |
+| `` Ctrl + ` `` | Show/hide Ink Domain window | Global |
+| `Ctrl + Shift + M` | Open Ink Domain mode | Global |
+| `H` | Hide Ink Domain window | Ink Domain |
 | `Esc` | Exit fullscreen | Fullscreen |
 
 ---

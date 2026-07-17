@@ -395,9 +395,9 @@ function setupModeSelector() {
         <div class="mode-option-desc">沉浸式全屏</div>
       </div>
       <div class="mode-option" data-mode="moyu">
-        <div class="mode-option-icon">🐟</div>
-        <div class="mode-option-name">摸鱼模式</div>
-        <div class="mode-option-desc">隐蔽长条栏</div>
+        <div class="mode-option-icon">🖋️</div>
+        <div class="mode-option-name">墨域模式</div>
+        <div class="mode-option-desc">墨色置顶长条</div>
       </div>
     </div>
   `;

@@ -20,6 +20,7 @@
     "appId": "com.doosho.shureader",
     "productName": "书库阅读器",
     "copyright": "Copyright © 2024 shu-reader",
+    "icon": "build/icon.ico",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -30,6 +31,8 @@
       "launch.js",
       "lib/**/*",
       "src/**/*",
+      "build/icon.ico",
+      "build/icon.png",
       "package.json",
       "!ShuReader.exe",
       "!tools/**/*",
@@ -64,6 +67,7 @@
       }
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",

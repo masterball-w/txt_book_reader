@@ -24,6 +24,14 @@ protocol.registerSchemesAsPrivileged([
 // GPU cache 修复
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 
+function getAppIconPath() {
+  const ico = path.join(__dirname, 'build', 'icon.ico');
+  if (fs.existsSync(ico)) return ico;
+  const png = path.join(__dirname, 'build', 'icon.png');
+  if (fs.existsSync(png)) return png;
+  return undefined;
+}
+
 // 单实例锁
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -259,6 +267,7 @@ function createMainWindow() {
     minWidth: 800,
     minHeight: 600,
     title: '书库阅读器',
+    icon: getAppIconPath(),
     backgroundColor: '#1a1a2e',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -303,6 +312,7 @@ function createReaderWindow(mode, state) {
     fullscreen: isFullscreen,
     frame: true,
     title: '阅读',
+    icon: getAppIconPath(),
     backgroundColor: '#1a1a2e',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

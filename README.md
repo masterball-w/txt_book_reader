@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/screenshots/摸鱼模式文字框（修改背景和文字颜色之后%29.png" alt="墨域模式 · 自动适配背景色" width="860"/>
+  <img src="docs/screenshots/墨域模式-自动适配背景色演示.gif" alt="墨域模式 · 自动适配背景色动态演示" width="860"/>
 </p>
 
 <h1 align="center">书库阅读器 · ShuReader</h1>
@@ -42,7 +42,7 @@
 | **外部导入** | TXT / EPUB / MOBI；窗口与全屏支持 EPUB/MOBI 插图 |
 | **阅读辅助** | 书签、书架、章节跳转、全文搜索、主题与屏幕取色 |
 
-![阅读界面](docs/screenshots/阅读界面.png)
+![墨域模式 · 自动适配背景色](docs/screenshots/摸鱼模式文字框（修改背景和文字颜色之后%29.png)
 
 ---
 
@@ -117,7 +117,9 @@
 - **全屏模式** — 沉浸阅读，悬停显示工具栏
 - **墨域模式** — 透明置顶长条，`` Ctrl+` `` 一键隐藏
 
-![墨域模式的阅读界面](docs/screenshots/墨域模式的阅读界面.png)
+![阅读界面](docs/screenshots/阅读界面.png)
+
+![墨域模式的阅读界面](docs/screenshots/摸鱼模式的阅读界面.png)
 
 ### 搜索 / 书签 / 主题
 

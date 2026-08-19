@@ -798,6 +798,21 @@ ipcMain.on('moyu-drag', (event, { dx, dy }) => {
   }
 });
 
+// ---- 墨域模式常用文字颜色（语法高亮高频色，参考 One Dark 色板）----
+const MOYU_TEXT_COLORS = [
+  { name: '白色', value: '#FFFFFF' },
+  { name: '浅灰', value: '#ABB2BF' },
+  { name: '黑色', value: '#000000' },
+  { name: '深灰', value: '#5C6370' },
+  { name: '红色', value: '#E06C75' },
+  { name: '橙色', value: '#D19A66' },
+  { name: '黄色', value: '#E5C07B' },
+  { name: '绿色', value: '#98C379' },
+  { name: '青色', value: '#56B6C2' },
+  { name: '蓝色', value: '#61AFEF' },
+  { name: '紫色', value: '#C678DD' }
+];
+
 // ---- 墨域模式原生右键菜单 ----
 ipcMain.on('moyu-context-menu', (event, data) => {
   const bookmarks = (data && data.bookmarks) || [];
@@ -826,6 +841,17 @@ ipcMain.on('moyu-context-menu', (event, data) => {
     { label: '📑 章节目录', submenu: chapterSubmenu },
     { type: 'separator' },
     { label: '🎨 自动适配背景色', click: () => sendMoyuAction(event, 'auto-backdrop') },
+    {
+      label: '🖌️ 文字颜色',
+      submenu: [
+        { label: '自动适配（随背景明暗）', click: () => sendMoyuAction(event, 'textcolor:auto') },
+        { type: 'separator' },
+        ...MOYU_TEXT_COLORS.map(c => ({
+          label: `${c.name}  ${c.value}`,
+          click: () => sendMoyuAction(event, `textcolor:${c.value}`)
+        }))
+      ]
+    },
     { type: 'separator' },
     { label: '🪟 切换到窗口模式', click: () => sendMoyuAction(event, 'mode-window') },
     { label: '🖥️ 切换到全屏模式', click: () => sendMoyuAction(event, 'mode-fullscreen') },

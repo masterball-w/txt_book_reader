@@ -772,18 +772,50 @@ async function saveBookmarkAndExit() {
 }
 
 // ===== 摸鱼模式：自动适配背景色 =====
-// 捕获阅读条所在位置的屏幕背景色，直接应用为主题背景色（文字颜色保持不变）
+// YIQ 感知亮度（0-255），用于判断背景明暗
+function yiqBrightness(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (299 * r + 587 * g + 114 * b) / 1000;
+}
+
+// 根据背景明暗返回可读的文字颜色：背景亮用深字，背景暗用浅字
+function autoTextColorForBg(bgHex) {
+  return yiqBrightness(bgHex) >= 128 ? '#1a1a1a' : '#f0f0f0';
+}
+
+// 捕获阅读条所在位置的屏幕背景色，直接应用为主题背景色；
+// 若当前文字颜色与新背景对比度不足，自动联动调整文字颜色
 async function autoMatchBackdrop() {
   const result = await window.api.captureMoyuBackdrop();
   if (!result || !result.color) {
     showToast('无法捕获背景色');
     return;
   }
-  const theme = { ...currentTheme, preset: 'custom', followSystem: false, bgPrimary: result.color };
+  let textPrimary = currentTheme.textPrimary;
+  let autoAdjusted = false;
+  // 文字与背景亮度差过小（<60）视为不可读，自动换用适配色
+  if (Math.abs(yiqBrightness(textPrimary) - yiqBrightness(result.color)) < 60) {
+    textPrimary = autoTextColorForBg(result.color);
+    autoAdjusted = true;
+  }
+  const theme = { ...currentTheme, preset: 'custom', followSystem: false, bgPrimary: result.color, textPrimary };
   currentTheme = theme;
   applyTheme(theme);
   await window.api.saveTheme(theme);
-  showToast('背景色已适配: ' + result.color);
+  showToast('背景色已适配: ' + result.color + (autoAdjusted ? '\n文字颜色已自动调整' : ''));
+}
+
+// ===== 摸鱼模式：文字颜色 =====
+async function applyMoyuTextColor(color) {
+  // color 为 null 时按当前背景明暗自动选择
+  const finalColor = color || autoTextColorForBg(currentTheme.bgPrimary);
+  const theme = { ...currentTheme, preset: 'custom', followSystem: false, textPrimary: finalColor };
+  currentTheme = theme;
+  applyTheme(theme);
+  await window.api.saveTheme(theme);
+  showToast('文字颜色: ' + finalColor);
 }
 
 // ===== 右键菜单 =====
@@ -1115,6 +1147,12 @@ function handleContextAction(action) {
     if (chapters[idx]) {
       jumpToChapter(idx);
     }
+    return;
+  }
+  // 处理原生菜单的文字颜色选择
+  if (action.startsWith('textcolor:')) {
+    const value = action.substring('textcolor:'.length);
+    applyMoyuTextColor(value === 'auto' ? null : value);
     return;
   }
 

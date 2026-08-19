@@ -141,13 +141,11 @@ npm install
 
 | | |
 |--|--|
-| Windows | Double-click `ShuReader.exe` |
 | npm | `npm start` |
-| DevTools | `npm run dev` or `ShuReader.exe --dev` |
-| Rebuild launcher | `npm run build:launcher` (optional) |
+| DevTools | `npm run dev` |
 | Package installer | `npm run build` |
 
-> `ShuReader.exe` / `tools/launcher` are **not** included in the NSIS package.
+> Prefer a double-click launcher? Run `npm run build:launcher` to generate `ShuReader.exe` (source in `tools/launcher/`; neither the tool nor its output is packaged).
 
 ---
 
@@ -155,11 +153,10 @@ npm install
 
 ```
 txt_book_reader/
-├── ShuReader.exe       # local launcher (not packaged)
 ├── main.js / preload.js / launch.js
 ├── lib/                # format adapters & import store
 ├── src/                # UI
-├── tools/launcher/
+├── tools/launcher/     # optional launcher source (build output not committed)
 ├── docs/
 │   ├── social-preview.png
 │   └── screenshots/

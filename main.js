@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, Menu, shell, screen, nativeTheme, desktopCapturer, dialog, protocol, net } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, Menu, shell, screen, nativeTheme, desktopCapturer, dialog, protocol, net, Tray } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -40,7 +40,9 @@ if (!gotTheLock) {
   app.on('second-instance', () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
+      // 主界面藏于托盘时，再次启动应用应将其唤出
+      if (!mainWindow.isVisible()) restoreMainWindow();
+      else mainWindow.focus();
     }
   });
 }
@@ -96,6 +98,10 @@ let currentReadState = {
 };
 // 模式切换中不广播"阅读结束"（旧窗口关闭到新窗口创建之间的空档）
 let switchingMode = false;
+// 系统托盘（墨域模式期间主界面隐藏于此）
+let tray = null;
+// 应用正在退出时不做主界面恢复（避免退出瞬间闪窗）
+let appQuitting = false;
 
 // ============================================================
 // 阅读状态管理（单本锁）
@@ -123,6 +129,8 @@ function broadcastReadingStarted() {
 function notifyReadingEnded() {
   if (switchingMode) return;
   if (isReadingActive()) return;
+  // 阅读彻底结束，若主界面正藏于托盘则恢复
+  restoreMainWindow();
   if (mainWindow) mainWindow.webContents.send('reading-ended');
 }
 
@@ -291,6 +299,37 @@ function cleanupBookUserData(key) {
 // ============================================================
 // 窗口创建
 // ============================================================
+// 主界面隐藏到系统托盘（墨域模式防 Alt+Tab 暴露）
+function hideMainWindowToTray() {
+  if (!mainWindow) return;
+  mainWindow.hide();
+  if (!tray) {
+    const iconPath = getAppIconPath();
+    if (!iconPath) return;
+    tray = new Tray(iconPath);
+    tray.setToolTip('书库阅读器 — 墨域阅读中，点击图标恢复主界面');
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: '显示主界面', click: () => restoreMainWindow() },
+      { type: 'separator' },
+      { label: '退出应用', click: () => app.quit() }
+    ]));
+    tray.on('click', () => restoreMainWindow());
+  }
+}
+
+// 从托盘恢复主界面
+function restoreMainWindow() {
+  if (appQuitting) return;
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
+  if (mainWindow) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -411,6 +450,9 @@ function createMoyuWindow(state) {
       charOffset: state.charOffset != null ? String(state.charOffset) : ''
     }
   });
+
+  // 进入墨域模式：主界面隐藏到托盘，避免出现在 Alt+Tab 任务切换器
+  hideMainWindowToTray();
 
   moyuWindow.on('close', () => {
     moyuWindow = null;
@@ -565,6 +607,8 @@ ipcMain.handle('switch-mode', (event, { mode, category, bookid, page, charOffset
   createReaderWindow(mode, state);
   switchingMode = false;
   broadcastReadingStarted();
+  // 从墨域切回窗口/全屏：退出隐身状态，恢复主界面
+  if (mode !== 'moyu') restoreMainWindow();
   return { success: true };
 });
 
@@ -1086,8 +1130,16 @@ app.whenReady().then(() => {
   });
 });
 
+app.on('before-quit', () => {
+  appQuitting = true;
+});
+
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
 });
 
 app.on('window-all-closed', () => {

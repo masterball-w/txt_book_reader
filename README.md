@@ -37,7 +37,7 @@
 
 | | |
 |:---|:---|
-| **三种阅读模式** | 窗口 · 全屏 · 墨域（透明置顶长条，`` Ctrl+` `` 隐藏） |
+| **三种阅读模式** | 窗口 · 全屏 · 墨域（透明置顶长条，主界面自动隐入托盘，`` Ctrl+` `` 隐藏） |
 | **内置书库** | cn / en / yi，约 2200+ 本 TXT（[doosho/shu](https://github.com/doosho/shu)） |
 | **外部导入** | TXT / EPUB / MOBI；窗口与全屏支持 EPUB/MOBI 插图 |
 | **阅读辅助** | 书签、书架、章节跳转、全文搜索、主题与屏幕取色、墨域右键改色 |
@@ -56,6 +56,7 @@
 - **墨域文字颜色**：右键「文字颜色」子菜单支持随背景明暗自动适配，并提供 11 种语法高亮常用色（One Dark 色板）；适配背景色时若文字对比度不足会自动联动调整
 - **位置一致性修复**：阅读进度统一以字符偏移为参照，窗口 ↔ 墨域往返切换不再漂移
 - **主视图单本锁**：阅读中显示「正在阅读：XXX · 已阅读 XX分钟」实时横幅；退出当前书之前不支持打开第二本
+- **托盘隐身**：进入墨域模式后主界面自动隐藏到系统托盘（防 Alt+Tab 暴露），点击托盘图标即可恢复
 
 **「自动适配背景色」动态演示**：
 
@@ -170,13 +171,11 @@ npm install
 
 | 方式 | 命令 / 操作 |
 |------|-------------|
-| Windows 推荐 | 双击 `ShuReader.exe` |
-| npm | `npm start` |
-| 开发（DevTools） | `npm run dev` 或 `ShuReader.exe --dev` |
-| 重编译启动器 | `npm run build:launcher`（可选） |
+| Windows | `npm start` |
+| 开发（DevTools） | `npm run dev` |
 | 打安装包 | `npm run build` → `dist/ShuReader-Setup-<ver>-x64.exe` |
 
-> `ShuReader.exe` / `tools/launcher` **不会**打进安装包；`npm run build` 不会自动跑 `build:launcher`。
+> 想要双击即用的本地启动器，可运行 `npm run build:launcher` 生成 `ShuReader.exe`（源码见 `tools/launcher/`，产物与工具均不进入安装包）。
 
 ---
 
@@ -184,11 +183,10 @@ npm install
 
 ```
 txt_book_reader/
-├── ShuReader.exe       # 本地开发启动器（不进入安装包）
 ├── main.js / preload.js / launch.js
 ├── lib/                # 格式适配器与导入书库
 ├── src/                # 书库 UI 与阅读器
-├── tools/launcher/     # 启动器源码
+├── tools/launcher/     # 启动器源码（可选，编译产物不进版本库）
 ├── docs/
 │   ├── social-preview.png
 │   └── screenshots/

@@ -94,6 +94,37 @@ let currentReadState = {
   page: 0,
   mode: 'window'
 };
+// 模式切换中不广播"阅读结束"（旧窗口关闭到新窗口创建之间的空档）
+let switchingMode = false;
+
+// ============================================================
+// 阅读状态管理（单本锁）
+// ============================================================
+function isReadingActive() {
+  return !!(readerWindow || moyuWindow);
+}
+
+function getReadingTitle(state) {
+  const book = loadAllBooks().find(
+    b => b.category === state.category && sameBookId(b.bookid, state.bookid)
+  );
+  return book ? book.title : '未知书籍';
+}
+
+function broadcastReadingStarted() {
+  if (!mainWindow) return;
+  mainWindow.webContents.send('reading-started', {
+    category: currentReadState.category,
+    bookid: currentReadState.bookid,
+    title: getReadingTitle(currentReadState)
+  });
+}
+
+function notifyReadingEnded() {
+  if (switchingMode) return;
+  if (isReadingActive()) return;
+  if (mainWindow) mainWindow.webContents.send('reading-ended');
+}
 
 // ============================================================
 // 数据存储管理
@@ -327,7 +358,8 @@ function createReaderWindow(mode, state) {
       mode: mode,
       category: state.category,
       bookid: String(state.bookid),
-      page: String(state.page || 0)
+      page: String(state.page || 0),
+      charOffset: state.charOffset != null ? String(state.charOffset) : ''
     }
   });
 
@@ -337,6 +369,7 @@ function createReaderWindow(mode, state) {
 
   readerWindow.on('close', () => {
     readerWindow = null;
+    notifyReadingEnded();
   });
 }
 
@@ -374,12 +407,14 @@ function createMoyuWindow(state) {
       mode: 'moyu',
       category: state.category,
       bookid: String(state.bookid),
-      page: String(state.page || 0)
+      page: String(state.page || 0),
+      charOffset: state.charOffset != null ? String(state.charOffset) : ''
     }
   });
 
   moyuWindow.on('close', () => {
     moyuWindow = null;
+    notifyReadingEnded();
   });
 }
 
@@ -476,22 +511,48 @@ ipcMain.handle('search-content', async (event, { keyword, category }) => {
   return results;
 });
 
-// 打开阅读器
+// 打开阅读器（单本锁：阅读期间禁止打开第二本）
 ipcMain.handle('open-reader', (event, { category, bookid, page, mode }) => {
+  if (isReadingActive()) {
+    return {
+      success: false,
+      error: 'reading',
+      title: getReadingTitle(currentReadState)
+    };
+  }
+
   const state = { category, bookid: normalizeBookId(bookid), page: page || 0 };
   createReaderWindow(mode || 'window', state);
 
   // 添加到书架
   addToShelf(category, state.bookid, page || 0);
 
+  broadcastReadingStarted();
   return { success: true };
 });
 
-// 切换阅读模式
-ipcMain.handle('switch-mode', (event, { mode, category, bookid, page }) => {
-  const state = { category, bookid: normalizeBookId(bookid), page: page || 0 };
+// 查询当前阅读状态（主视图初始化/点击卡片时使用）
+ipcMain.handle('get-reading-state', () => {
+  if (!isReadingActive()) return { reading: false };
+  return {
+    reading: true,
+    category: currentReadState.category,
+    bookid: currentReadState.bookid,
+    title: getReadingTitle(currentReadState)
+  };
+});
 
-  // 关闭当前阅读窗口
+// 切换阅读模式
+ipcMain.handle('switch-mode', (event, { mode, category, bookid, page, charOffset }) => {
+  const state = {
+    category,
+    bookid: normalizeBookId(bookid),
+    page: page || 0,
+    charOffset: typeof charOffset === 'number' ? charOffset : null
+  };
+
+  // 关闭当前阅读窗口（模式切换，阅读不中断，不广播结束）
+  switchingMode = true;
   if (readerWindow) {
     readerWindow.close();
     readerWindow = null;
@@ -502,6 +563,8 @@ ipcMain.handle('switch-mode', (event, { mode, category, bookid, page }) => {
   }
 
   createReaderWindow(mode, state);
+  switchingMode = false;
+  broadcastReadingStarted();
   return { success: true };
 });
 
@@ -568,10 +631,15 @@ ipcMain.handle('delete-bookmark', (event, { category, bookid, index }) => {
 });
 
 // ---- 阅读进度 ----
-ipcMain.handle('save-progress', (event, { category, bookid, page, scroll }) => {
+ipcMain.handle('save-progress', (event, { category, bookid, page, scroll, charOffset }) => {
   const data = loadData();
   const key = `${category}_${bookid}`;
-  data.progress[key] = { page, scroll, timestamp: Date.now() };
+  data.progress[key] = {
+    page,
+    scroll,
+    charOffset: typeof charOffset === 'number' ? charOffset : null,
+    timestamp: Date.now()
+  };
   saveData(data);
   return { success: true };
 });
@@ -753,8 +821,11 @@ ipcMain.on('moyu-context-menu', (event, data) => {
 
   const menu = Menu.buildFromTemplate([
     { label: '🔖 保存书签', click: () => sendMoyuAction(event, 'bookmark') },
-    { label: '📋 书签列表', submenu: bookmarkSubmenu },
+    { label: '� 保存书签并退出', click: () => sendMoyuAction(event, 'bookmark-exit') },
+    { label: '� 书签列表', submenu: bookmarkSubmenu },
     { label: '📑 章节目录', submenu: chapterSubmenu },
+    { type: 'separator' },
+    { label: '🎨 自动适配背景色', click: () => sendMoyuAction(event, 'auto-backdrop') },
     { type: 'separator' },
     { label: '🪟 切换到窗口模式', click: () => sendMoyuAction(event, 'mode-window') },
     { label: '🖥️ 切换到全屏模式', click: () => sendMoyuAction(event, 'mode-fullscreen') },
@@ -872,6 +943,66 @@ ipcMain.handle('capture-screen', async () => {
   return null;
 });
 
+// ---- 摸鱼模式自动适配背景色：捕获窗口下层背景色 ----
+ipcMain.handle('capture-moyu-backdrop', async () => {
+  try {
+    if (!moyuWindow) return null;
+    const winBounds = moyuWindow.getBounds();
+    const display = screen.getDisplayMatching(winBounds);
+    const { width, height } = display.size;
+    const scaleFactor = display.scaleFactor;
+
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: {
+        width: Math.floor(width * scaleFactor),
+        height: Math.floor(height * scaleFactor)
+      }
+    });
+
+    const source = sources.find(s => String(s.display_id) === String(display.id)) || sources[0];
+    if (!source) return null;
+
+    const thumb = source.thumbnail;
+    const size = thumb.getSize();
+    const bitmap = thumb.toBitmap();
+    if (!bitmap || !size.width || !size.height) return null;
+
+    // 截图包含摸鱼窗口自身，采样点取窗口四边外侧 8px，即窗口下层的背景色
+    const dispBounds = display.bounds;
+    const pad = 8;
+    const candidates = [
+      { x: winBounds.x + Math.floor(winBounds.width / 2), y: winBounds.y - pad },
+      { x: winBounds.x + Math.floor(winBounds.width / 2), y: winBounds.y + winBounds.height + pad },
+      { x: winBounds.x - pad, y: winBounds.y + Math.floor(winBounds.height / 2) },
+      { x: winBounds.x + winBounds.width + pad, y: winBounds.y + Math.floor(winBounds.height / 2) }
+    ];
+
+    const counts = new Map();
+    for (const p of candidates) {
+      const px = Math.round((p.x - dispBounds.x) * scaleFactor);
+      const py = Math.round((p.y - dispBounds.y) * scaleFactor);
+      if (px < 0 || py < 0 || px >= size.width || py >= size.height) continue;
+      const idx = (py * size.width + px) * 4;
+      // nativeImage bitmap 为 BGRA 排列
+      const hex = '#' + [bitmap[idx + 2], bitmap[idx + 1], bitmap[idx]]
+        .map(c => c.toString(16).padStart(2, '0')).join('');
+      counts.set(hex, (counts.get(hex) || 0) + 1);
+    }
+
+    if (counts.size === 0) return null;
+    let color = null;
+    let bestCount = 0;
+    for (const [hex, cnt] of counts) {
+      if (cnt > bestCount) { color = hex; bestCount = cnt; }
+    }
+    return { color };
+  } catch (e) {
+    console.error('捕获摸鱼背景色失败:', e);
+    return null;
+  }
+});
+
 // ============================================================
 // 全局快捷键
 // ============================================================
@@ -920,10 +1051,11 @@ app.whenReady().then(() => {
     }
   });
 
-  // Ctrl+Shift+M 快速打开墨域模式（从主窗口）
+  // Ctrl+Shift+M 快速打开墨域模式（从主窗口，遵守单本锁）
   globalShortcut.register('CommandOrControl+Shift+M', () => {
-    if (mainWindow && !moyuWindow && currentReadState) {
+    if (mainWindow && !isReadingActive() && currentReadState) {
       createMoyuWindow(currentReadState);
+      broadcastReadingStarted();
     }
   });
 });

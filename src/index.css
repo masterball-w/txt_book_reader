@@ -47,6 +47,36 @@ body {
   flex-shrink: 0;
 }
 
+/* ===== 正在阅读状态横幅 ===== */
+.reading-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.reading-banner-icon {
+  font-size: 16px;
+}
+
+.reading-banner #readingBannerTitle {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.reading-banner #readingBannerTime {
+  color: var(--text-secondary);
+}
+
+.reading-banner-divider {
+  color: var(--text-muted);
+}
+
 .logo {
   display: flex;
   align-items: center;

@@ -363,7 +363,13 @@ async function doSearch() {
 // ===== 模式选择器 =====
 let pendingBook = null;
 
-function showModeSelector(category, bookid) {
+async function showModeSelector(category, bookid) {
+  // 单本锁：阅读期间禁止打开第二本
+  const state = await window.api.getReadingState();
+  if (state && state.reading) {
+    alert(`正在阅读《${state.title}》，请先退出当前书籍`);
+    return;
+  }
   pendingBook = { category, bookid };
   document.querySelector('.mode-selector-overlay').classList.add('show');
   document.querySelector('.mode-selector').classList.add('show');
@@ -416,13 +422,61 @@ function setupModeSelector() {
       const progress = await window.api.getProgress(pendingBook.category, pendingBook.bookid);
       const page = progress ? progress.page : 0;
 
-      await window.api.openReader(pendingBook.category, pendingBook.bookid, page, mode);
+      const result = await window.api.openReader(pendingBook.category, pendingBook.bookid, page, mode);
+      if (!result.success) {
+        if (result.error === 'reading') {
+          alert(`正在阅读《${result.title}》，请先退出当前书籍`);
+        }
+        hideModeSelector();
+        return;
+      }
       hideModeSelector();
 
       // 刷新书架
       bookshelf = await window.api.getBookshelf();
       document.getElementById('count-shelf').textContent = bookshelf.length;
     });
+  });
+}
+
+// ===== 正在阅读状态横幅 =====
+let readingBannerTimer = null;
+let readingBannerBaseline = 0;
+let readingBannerStartAt = 0;
+
+async function activateReadingBanner(info) {
+  document.getElementById('readingBannerTitle').textContent = info.title;
+  // 基线 = 已累计的阅读时长，横幅显示 = 基线 + 本次会话经过时间（实时）
+  readingBannerBaseline = await window.api.getReadingTime(info.category, info.bookid) || 0;
+  readingBannerStartAt = Date.now();
+  document.getElementById('readingBanner').style.display = 'flex';
+  updateReadingBannerTime();
+
+  if (readingBannerTimer) clearInterval(readingBannerTimer);
+  readingBannerTimer = setInterval(updateReadingBannerTime, 5000);
+}
+
+function deactivateReadingBanner() {
+  if (readingBannerTimer) {
+    clearInterval(readingBannerTimer);
+    readingBannerTimer = null;
+  }
+  document.getElementById('readingBanner').style.display = 'none';
+}
+
+function updateReadingBannerTime() {
+  const elapsed = Math.floor((Date.now() - readingBannerStartAt) / 1000);
+  document.getElementById('readingBannerTime').textContent =
+    formatReadingTime(readingBannerBaseline + elapsed);
+}
+
+function setupReadingBanner() {
+  window.api.onReadingStarted((info) => activateReadingBanner(info));
+  window.api.onReadingEnded(() => deactivateReadingBanner());
+
+  // 主视图启动时可能已有正在进行的阅读（如摸鱼模式中）
+  window.api.getReadingState().then(state => {
+    if (state && state.reading) activateReadingBanner(state);
   });
 }
 
@@ -473,6 +527,7 @@ function updateTotalTime() {
 
 // ===== 启动 =====
 setupModeSelector();
+setupReadingBanner();
 init();
 
 // 定时刷新阅读时长

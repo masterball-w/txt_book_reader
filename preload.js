@@ -20,8 +20,11 @@ contextBridge.exposeInMainWorld('api', {
   // 阅读器
   openReader: (category, bookid, page, mode) =>
     ipcRenderer.invoke('open-reader', { category, bookid, page, mode }),
-  switchMode: (mode, category, bookid, page) =>
-    ipcRenderer.invoke('switch-mode', { mode, category, bookid, page }),
+  getReadingState: () => ipcRenderer.invoke('get-reading-state'),
+  onReadingStarted: (callback) => ipcRenderer.on('reading-started', (e, info) => callback(info)),
+  onReadingEnded: (callback) => ipcRenderer.on('reading-ended', () => callback()),
+  switchMode: (mode, category, bookid, page, charOffset) =>
+    ipcRenderer.invoke('switch-mode', { mode, category, bookid, page, charOffset }),
   closeReader: () => ipcRenderer.invoke('close-reader'),
   hideMoyu: () => ipcRenderer.invoke('hide-moyu'),
   showMoyu: () => ipcRenderer.invoke('show-moyu'),
@@ -35,8 +38,8 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('delete-bookmark', { category, bookid, index }),
 
   // 阅读进度
-  saveProgress: (category, bookid, page, scroll) =>
-    ipcRenderer.invoke('save-progress', { category, bookid, page, scroll }),
+  saveProgress: (category, bookid, page, scroll, charOffset) =>
+    ipcRenderer.invoke('save-progress', { category, bookid, page, scroll, charOffset }),
   getProgress: (category, bookid) =>
     ipcRenderer.invoke('get-progress', { category, bookid }),
 
@@ -69,4 +72,6 @@ contextBridge.exposeInMainWorld('api', {
 
   // 屏幕取色
   captureScreen: () => ipcRenderer.invoke('capture-screen'),
+  // 摸鱼模式自动适配背景色：捕获窗口下层背景色
+  captureMoyuBackdrop: () => ipcRenderer.invoke('capture-moyu-backdrop'),
 });

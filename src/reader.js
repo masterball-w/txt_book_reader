@@ -176,13 +176,18 @@ async function init() {
   document.getElementById('bookInfo').textContent = `${bookTitle}${bookAuthor ? ' · ' + bookAuthor : ''}`;
   document.title = bookTitle;
 
-  // 加载进度（统一使用行索引作为位置参照）
-  let savedLineIndex = 0;
+  // 加载进度（统一使用字符偏移作为位置参照，行索引仅作旧数据兼容）
+  let savedCharOffset = 0;
   const progress = await window.api.getProgress(CATEGORY, BOOKID);
-  if (progress && progress.page !== undefined) {
-    savedLineIndex = progress.page;
+  const urlCharOffset = parseInt(urlParams.get('charOffset') || '', 10);
+  if (progress && typeof progress.charOffset === 'number') {
+    savedCharOffset = progress.charOffset;
+  } else if (progress && typeof progress.page === 'number') {
+    savedCharOffset = moyuLineOffsets[progress.page] || 0;
+  } else if (!isNaN(urlCharOffset) && urlCharOffset >= 0) {
+    savedCharOffset = urlCharOffset;
   } else {
-    savedLineIndex = START_PAGE;
+    savedCharOffset = moyuLineOffsets[START_PAGE] || 0;
   }
 
   // 加载书签
@@ -203,14 +208,14 @@ async function init() {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         calculatePages();
-        goToLineIndex(savedLineIndex);
+        goToCharOffset(savedCharOffset);
         startReadingTimer();
         bindEvents();
       });
     });
   } else {
     calculatePages();
-    goToLineIndex(savedLineIndex);
+    goToCharOffset(savedCharOffset);
     startReadingTimer();
     bindEvents();
   }
@@ -221,26 +226,39 @@ async function init() {
 
 function getCurrentLineIndex() {
   if (MODE === 'moyu') {
-    const charStart = moyuCurrentPage * moyuCharsPerPage;
-    return getMoyuLineForCharOffset(charStart);
-  } else {
-    return pageStartLines[currentPage] || 0;
+    return getMoyuLineForCharOffset(getCurrentCharOffset());
   }
+  return pageStartLines[currentPage] || 0;
+}
+
+// 当前位置在墨域拼接全文中的字符偏移（所有模式统一的位置参照）
+function getCurrentCharOffset() {
+  if (MODE === 'moyu') {
+    return moyuCurrentPage * moyuCharsPerPage;
+  }
+  const startLine = pageStartLines[currentPage] || 0;
+  return moyuLineOffsets[startLine] || 0;
 }
 
 function goToLineIndex(lineIndex, targetChapterIdx) {
   if (lineIndex < 0) lineIndex = 0;
   if (lineIndex >= bookLines.length) lineIndex = bookLines.length - 1;
+  goToCharOffset(moyuLineOffsets[lineIndex] || 0, targetChapterIdx);
+}
+
+function goToCharOffset(charOffset, targetChapterIdx) {
+  if (!isFinite(charOffset) || charOffset < 0) charOffset = 0;
+  if (charOffset > moyuFullText.length) charOffset = moyuFullText.length;
 
   if (MODE === 'moyu') {
-    const charOffset = moyuLineOffsets[lineIndex] || 0;
     moyuCurrentPage = Math.floor(charOffset / moyuCharsPerPage);
     if (moyuCurrentPage >= totalPages) moyuCurrentPage = totalPages - 1;
     if (moyuCurrentPage < 0) moyuCurrentPage = 0;
     currentPage = moyuCurrentPage;
     renderMoyuPage();
   } else {
-    // 二分查找 lineIndex 所在的页
+    // 字符偏移 → 所在行 → 二分查找行所在的页
+    const lineIndex = getMoyuLineForCharOffset(charOffset);
     let lo = 0, hi = pageStartLines.length - 1;
     while (lo < hi) {
       const mid = Math.floor((lo + hi + 1) / 2);
@@ -670,8 +688,7 @@ let saveProgressTimer = null;
 function saveProgressDebounced() {
   if (saveProgressTimer) clearTimeout(saveProgressTimer);
   saveProgressTimer = setTimeout(() => {
-    const lineIndex = getCurrentLineIndex();
-    window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0);
+    window.api.saveProgress(CATEGORY, BOOKID, getCurrentLineIndex(), 0, getCurrentCharOffset());
   }, 500);
 }
 
@@ -736,11 +753,37 @@ function renderBookmarks() {
 // 切换时传递行索引而非页码，确保位置一致
 async function switchMode(newMode) {
   const lineIndex = getCurrentLineIndex();
-  await window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0);
+  const charOffset = getCurrentCharOffset();
+  await window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0, charOffset);
   if (readingTimeSeconds > 0) {
     await window.api.saveReadingTime(CATEGORY, BOOKID, readingTimeSeconds);
   }
-  window.api.switchMode(newMode, CATEGORY, BOOKID, lineIndex).catch(() => {});
+  window.api.switchMode(newMode, CATEGORY, BOOKID, lineIndex, charOffset).catch(() => {});
+}
+
+// ===== 摸鱼模式：保存书签并退出 =====
+async function saveBookmarkAndExit() {
+  await saveBookmark();
+  await window.api.saveProgress(CATEGORY, BOOKID, getCurrentLineIndex(), 0, getCurrentCharOffset());
+  if (readingTimeSeconds > 0) {
+    await window.api.saveReadingTime(CATEGORY, BOOKID, readingTimeSeconds);
+  }
+  window.api.closeReader().catch(() => {});
+}
+
+// ===== 摸鱼模式：自动适配背景色 =====
+// 捕获阅读条所在位置的屏幕背景色，直接应用为主题背景色（文字颜色保持不变）
+async function autoMatchBackdrop() {
+  const result = await window.api.captureMoyuBackdrop();
+  if (!result || !result.color) {
+    showToast('无法捕获背景色');
+    return;
+  }
+  const theme = { ...currentTheme, preset: 'custom', followSystem: false, bgPrimary: result.color };
+  currentTheme = theme;
+  applyTheme(theme);
+  await window.api.saveTheme(theme);
+  showToast('背景色已适配: ' + result.color);
 }
 
 // ===== 右键菜单 =====
@@ -939,7 +982,7 @@ function bindEvents() {
 
   document.getElementById('backBtn').addEventListener('click', async () => {
     const lineIndex = getCurrentLineIndex();
-    await window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0);
+    await window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0, getCurrentCharOffset());
     if (readingTimeSeconds > 0) {
       await window.api.saveReadingTime(CATEGORY, BOOKID, readingTimeSeconds);
     }
@@ -988,16 +1031,16 @@ function bindEvents() {
     window.addEventListener('resize', () => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        const savedLine = getCurrentLineIndex();
+        const savedOffset = getCurrentCharOffset();
         calculatePages();
-        goToLineIndex(savedLine);
+        goToCharOffset(savedOffset);
       }, 200);
     });
   }
 
   window.addEventListener('beforeunload', () => {
     const lineIndex = getCurrentLineIndex();
-    window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0);
+    window.api.saveProgress(CATEGORY, BOOKID, lineIndex, 0, getCurrentCharOffset());
     if (readingTimeSeconds > 0) {
       window.api.saveReadingTime(CATEGORY, BOOKID, readingTimeSeconds);
     }
@@ -1078,6 +1121,12 @@ function handleContextAction(action) {
   switch (action) {
     case 'bookmark':
       saveBookmark();
+      break;
+    case 'bookmark-exit':
+      saveBookmarkAndExit();
+      break;
+    case 'auto-backdrop':
+      autoMatchBackdrop();
       break;
     case 'bookmarkList':
       // 仅窗口/全屏模式会触发（墨域模式用原生子菜单）
@@ -1172,9 +1221,9 @@ function applyTheme(theme) {
 
   // 主题变化后，墨域模式需要重新计算分页
   if (MODE === 'moyu' && bookLines.length > 0 && moyuFullText) {
-    const savedLine = getCurrentLineIndex();
+    const savedOffset = getCurrentCharOffset();
     calculatePages();
-    goToLineIndex(savedLine);
+    goToCharOffset(savedOffset);
   } else if (bookLines.length > 0) {
     renderPage();
   }

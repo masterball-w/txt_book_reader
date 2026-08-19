@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/social-preview.png" alt="ShuReader / 书库阅读器" width="860"/>
+  <img src="docs/screenshots/摸鱼模式文字框（修改背景和文字颜色之后%29.png" alt="墨域模式 · 自动适配背景色" width="860"/>
 </p>
 
 <h1 align="center">书库阅读器 · ShuReader</h1>
@@ -49,6 +49,22 @@
 ## 更新日志
 
 按日期倒序，最新在上。
+
+### 2026-08-19 · v1.4.0
+
+- **墨域右键增强**：新增「保存书签并退出」与「自动适配背景色」——一键捕获阅读条下层的屏幕背景色并应用为主题背景，无需切回窗口模式手动取色
+- **位置一致性修复**：阅读进度统一以字符偏移为参照，窗口 ↔ 墨域往返切换不再漂移
+- **主视图单本锁**：阅读中显示「正在阅读：XXX · 已阅读 XX分钟」实时横幅；退出当前书之前不支持打开第二本
+
+**「自动适配背景色」效果对比**：
+
+| 适配前 | 适配后 |
+|:---:|:---:|
+| ![墨域模式默认效果](docs/screenshots/摸鱼模式文字框.png) | ![墨域模式自动适配背景色后](docs/screenshots/摸鱼模式文字框（修改背景和文字颜色之后%29.png) |
+
+安装包：[`ShuReader-Setup-1.4.0-x64.exe`](https://github.com/masterball-w/txt_book_reader/releases/tag/v1.4.0)
+
+---
 
 ### 2026-07-17 · v1.3.0
 

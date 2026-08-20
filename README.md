@@ -50,6 +50,21 @@
 
 按日期倒序，最新在上。
 
+### 2026-08-20 · v1.5.0
+
+- **双版本安装包**：提供「完全体 / 轻量版」两种安装包，轻量版仅 80 MB（原 900 MB），内置 5 本示例书
+- **轻量版书库引导**：应用内横幅引导三步完成完整书库安装（获取 doosho/shu 仓库 → 复制 `cn` / `en` / `yi` 到书库目录 → 重新扫描），示例书进度与完整库无缝衔接
+- **外部书库支持**：书库目录改为 `%APPDATA%/书库阅读器/shu/` 优先，手动放置的完整书库自动生效，无需重装应用
+
+安装包（二选一）：
+
+| 版本 | 文件 | 适合人群 |
+|------|------|----------|
+| 完全体 | [`ShuReader-Setup-1.5.0-Full-x64.exe`](https://github.com/masterball-w/txt_book_reader/releases/tag/v1.5.0) | 网络不限、想开箱即读 2200+ 本 |
+| 轻量版 | [`ShuReader-Setup-1.5.0-Lite-x64.exe`](https://github.com/masterball-w/txt_book_reader/releases/tag/v1.5.0) | 带宽 / 磁盘敏感，或想先试用再装书库 |
+
+---
+
 ### 2026-08-19 · v1.4.0
 
 - **墨域右键增强**：新增「保存书签并退出」与「自动适配背景色」——一键捕获阅读条下层的屏幕背景色并应用为主题背景，无需切回窗口模式手动取色
@@ -155,9 +170,24 @@
 
 ### 方式一：安装包（推荐）
 
-1. 打开 [Releases](https://github.com/masterball-w/txt_book_reader/releases/latest)
-2. 下载 `ShuReader-Setup-*-x64.exe`
-3. 安装后从桌面或开始菜单启动
+打开 [Releases](https://github.com/masterball-w/txt_book_reader/releases/latest)，按需选择版本：
+
+| 版本 | 文件名 | 体积 | 内容 |
+|------|--------|------|------|
+| **完全体** | `ShuReader-Setup-<版本>-Full-x64.exe` | 约 900 MB | 内置完整书库（2200+ 本），安装即读，全程离线 |
+| **轻量版** | `ShuReader-Setup-<版本>-Lite-x64.exe` | 约 80 MB | 仅内置 5 本示例书，完整书库按需手动安装（见下） |
+
+安装后从桌面或开始菜单启动。
+
+#### 轻量版如何升级为完整书库
+
+轻量版首次启动会在顶部显示引导横幅，三个按钮完成全部操作：
+
+1. 点击 **「获取完整书库」** —— 浏览器打开 [doosho/shu](https://github.com/doosho/shu) 仓库，点 `Code → Download ZIP` 下载（约 2.5 GB）
+2. 点击 **「打开书库目录」** —— 打开书库文件夹 `%APPDATA%/书库阅读器/shu/`
+3. 将 ZIP 解压出的 `cn` / `en` / `yi` 三个文件夹复制进书库目录，回到应用点击 **「重新扫描」**
+
+完成后书架即刻显示 2200+ 本藏书；示例书的阅读进度与书签自动衔接（两种书库 bookid 一致）。不想手动下载的话，直接装完全体安装包即可。
 
 ### 方式二：源码运行
 
@@ -173,7 +203,8 @@ npm install
 |------|-------------|
 | Windows | `npm start` |
 | 开发（DevTools） | `npm run dev` |
-| 打安装包 | `npm run build` → `dist/ShuReader-Setup-<ver>-x64.exe` |
+| 打完全体安装包 | `npm run build:full` → `dist/ShuReader-Setup-<版本>-Full-x64.exe` |
+| 打轻量版安装包 | `npm run build:lite` → `dist/ShuReader-Setup-<版本>-Lite-x64.exe`（示例书清单见 `tools/build-lite-books.js`） |
 
 > 想要双击即用的本地启动器，可运行 `npm run build:launcher` 生成 `ShuReader.exe`（源码见 `tools/launcher/`，产物与工具均不进入安装包）。
 
@@ -206,6 +237,8 @@ txt_book_reader/
 | `shu/yi/` | 译文 | 424 |
 
 本地导入保存在 `%APPDATA%/书库阅读器/imported-books/`，不写入 `shu/`。
+
+轻量版用户手动放置的完整书库目录为 `%APPDATA%/书库阅读器/shu/`（与安装包内置书库同结构），放置后应用内点击「重新扫描」即生效。
 
 ---
 

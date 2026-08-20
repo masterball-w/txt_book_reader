@@ -1,12 +1,14 @@
 {
   "name": "shu-reader",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "书库阅读器 - 支持全屏/窗口/墨域三种阅读模式",
   "main": "main.js",
   "scripts": {
     "start": "node launch.js",
     "dev": "node launch.js --dev",
-    "build": "electron-builder --win --x64",
+    "build": "node tools/build.js full",
+    "build:full": "node tools/build.js full",
+    "build:lite": "node tools/build.js lite",
     "build:dir": "electron-builder --win --x64 --dir",
     "build:launcher": "tools\\launcher\\build-launcher.bat"
   },
@@ -39,33 +41,6 @@
       "!scripts/**/*",
       "!start.bat"
     ],
-    "extraResources": [
-      {
-        "from": "shu/cn",
-        "to": "shu/cn",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "shu/en",
-        "to": "shu/en",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "shu/yi",
-        "to": "shu/yi",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "shu/README.md",
-        "to": "shu/README.md"
-      }
-    ],
     "win": {
       "icon": "build/icon.ico",
       "target": [
@@ -76,7 +51,7 @@
           ]
         }
       ],
-      "artifactName": "ShuReader-Setup-${version}-${arch}.exe"
+      "artifactName": "ShuReader-Setup-${version}-Full-x64.exe"
     },
     "nsis": {
       "oneClick": false,

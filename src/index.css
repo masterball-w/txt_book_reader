@@ -77,6 +77,67 @@ body {
   color: var(--text-muted);
 }
 
+/* 轻量版书库引导横幅 */
+.library-guide {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.library-guide-icon {
+  font-size: 18px;
+}
+
+.library-guide-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.6;
+}
+
+.library-guide-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.library-guide-hint code {
+  background: var(--bg-secondary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.library-guide-btn {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.library-guide-btn:hover {
+  background: var(--border);
+}
+
+.library-guide-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.library-guide-btn.primary:hover {
+  filter: brightness(1.1);
+}
+
 .logo {
   display: flex;
   align-items: center;

@@ -36,6 +36,20 @@
       <span>已阅读 <span id="readingBannerTime">0分钟</span></span>
     </div>
 
+    <!-- 轻量版书库引导（仅 Lite 安装包显示） -->
+    <div id="libraryGuide" class="library-guide" style="display:none;">
+      <span class="library-guide-icon">📦</span>
+      <div class="library-guide-text">
+        <strong>轻量版书库</strong> — 当前仅内置 5 本示例书。
+        <div class="library-guide-hint">
+          获取完整书库（2200+ 本）：点击「获取完整书库」打开 doosho/shu 仓库（Code → Download ZIP），将解压出的 <code>cn</code> / <code>en</code> / <code>yi</code> 三个文件夹复制到书库目录，然后点击「重新扫描」。
+        </div>
+      </div>
+      <button id="fetchLibraryBtn" class="library-guide-btn">获取完整书库</button>
+      <button id="openLibraryDirBtn" class="library-guide-btn">打开书库目录</button>
+      <button id="rescanLibraryBtn" class="library-guide-btn primary">重新扫描</button>
+    </div>
+
     <!-- 主体 -->
     <div class="main-body">
       <!-- 侧边栏 -->

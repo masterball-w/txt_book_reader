@@ -5,6 +5,9 @@ contextBridge.exposeInMainWorld('api', {
   getBooks: () => ipcRenderer.invoke('get-books'),
   readBook: (category, bookid) => ipcRenderer.invoke('read-book', { category, bookid }),
   getBookCount: () => ipcRenderer.invoke('get-book-count'),
+  getLibraryInfo: () => ipcRenderer.invoke('get-library-info'),
+  openLibraryDir: () => ipcRenderer.invoke('open-library-dir'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
   // 搜索
   searchBooks: (type, keyword) => ipcRenderer.invoke('search-books', { type, keyword }),

@@ -30,6 +30,9 @@ async function init() {
     if (el) el.textContent = counts[cat] || 0;
   }
 
+  // 轻量版书库引导
+  await initLibraryGuide();
+
   // 加载书架
   bookshelf = await window.api.getBookshelf();
   document.getElementById('count-shelf').textContent = bookshelf.length;
@@ -43,6 +46,43 @@ async function init() {
 
   // 绑定事件
   bindEvents();
+}
+
+// 轻量版引导：检测 Lite 安装包，提供完整书库安装路径
+async function initLibraryGuide() {
+  const guide = document.getElementById('libraryGuide');
+  if (!guide) return;
+
+  let info = null;
+  try { info = await window.api.getLibraryInfo(); } catch (e) { /* 忽略 */ }
+  if (!info || info.edition !== 'lite') return;
+
+  guide.style.display = 'flex';
+
+  document.getElementById('fetchLibraryBtn').addEventListener('click', () => {
+    window.api.openExternal('https://github.com/dooshu/shu');
+  });
+  document.getElementById('openLibraryDirBtn').addEventListener('click', () => {
+    window.api.openLibraryDir();
+  });
+  document.getElementById('rescanLibraryBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('rescanLibraryBtn');
+    btn.disabled = true;
+    btn.textContent = '扫描中...';
+    try {
+      await refreshBooks();
+      renderBookGrid(currentView);
+      const newInfo = await window.api.getLibraryInfo();
+      if (newInfo.edition !== 'lite') {
+        guide.style.display = 'none';
+      } else {
+        btn.textContent = `重新扫描（当前 ${newInfo.builtinCount} 本）`;
+      }
+    } finally {
+      btn.disabled = false;
+      if (btn.textContent === '扫描中...') btn.textContent = '重新扫描';
+    }
+  });
 }
 
 async function refreshBooks() {

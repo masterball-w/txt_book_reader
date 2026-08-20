@@ -47,12 +47,16 @@ if (!gotTheLock) {
   });
 }
 
-// 书库根目录
-// 打包模式：书籍在 resources/shu 目录下
-// 开发模式：书籍在项目上级目录（shu 子模块）
-const BOOKS_ROOT = app.isPackaged
-  ? path.join(process.resourcesPath, 'shu')
-  : path.join(__dirname, 'shu');
+// 书库根目录（动态解析，优先级从高到低）：
+// 1. userData/shu —— 用户手动放置的外部书库（Lite 版升级完整库的路径）
+// 2. resources/shu —— 安装包内置（Full=完整书库 / Lite=5 本示例书）
+// 3. 项目 shu/ 子模块 —— 开发模式
+function resolveBooksRoot() {
+  const external = path.join(app.getPath('userData'), 'shu');
+  if (fs.existsSync(path.join(external, 'cn', 'books.json'))) return external;
+  if (app.isPackaged) return path.join(process.resourcesPath, 'shu');
+  return path.join(__dirname, 'shu');
+}
 // 用户数据目录（延迟初始化）
 let USER_DATA_DIR = null;
 let DATA_FILE = null;
@@ -176,7 +180,7 @@ function loadBuiltinBooks() {
   const allBooks = [];
 
   for (const cat of categories) {
-    const jsonPath = path.join(BOOKS_ROOT, cat, 'books.json');
+    const jsonPath = path.join(resolveBooksRoot(), cat, 'books.json');
     if (!fs.existsSync(jsonPath)) continue;
 
     try {
@@ -211,7 +215,7 @@ function resolveBookPath(category, bookid) {
   if (category === LOCAL_CATEGORY) {
     return importedStore.resolveImportedPath(bookid);
   }
-  const filePath = path.join(BOOKS_ROOT, category, `${bookid}.txt`);
+  const filePath = path.join(resolveBooksRoot(), category, `${bookid}.txt`);
   return fs.existsSync(filePath) ? filePath : null;
 }
 
@@ -467,6 +471,48 @@ function createMoyuWindow(state) {
 // 获取所有书籍
 ipcMain.handle('get-books', () => {
   return loadAllBooks();
+});
+
+// 书库版本信息：Lite 安装包显示完整书库引导，外部书库视为 Full
+ipcMain.handle('get-library-info', () => {
+  const root = resolveBooksRoot();
+  const external = path.join(app.getPath('userData'), 'shu');
+  const isExternal = path.normalize(root) === path.normalize(external);
+
+  let edition = 'full';
+  const marker = path.join(root, 'library-edition.json');
+  if (fs.existsSync(marker)) {
+    try {
+      edition = JSON.parse(fs.readFileSync(marker, 'utf-8')).edition || 'full';
+    } catch (e) { /* 标记损坏按 full 处理 */ }
+  }
+  if (isExternal) edition = 'full'; // 外部书库 = 用户已放置完整库
+
+  return {
+    edition,
+    isExternal,
+    builtinCount: loadBuiltinBooks().length
+  };
+});
+
+// 打开书库目录（不存在则创建），供用户放置 doosho/shu 完整书库
+ipcMain.handle('open-library-dir', () => {
+  const dir = path.join(app.getPath('userData'), 'shu');
+  fs.mkdirSync(dir, { recursive: true });
+  shell.openPath(dir);
+  return dir;
+});
+
+// 用系统默认浏览器打开外部链接（仅限 https，防止任意路径执行）
+ipcMain.handle('open-external', (event, url) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return { success: false };
+    shell.openExternal(parsed.href);
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
 });
 
 // 读取书籍内容

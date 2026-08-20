@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/build.log
+build/shu-lite/
 *.log
 
 dist-release/

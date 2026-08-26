@@ -1,6 +1,6 @@
 {
   "name": "shu-reader",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "书库阅读器 - 支持全屏/窗口/墨域三种阅读模式",
   "main": "main.js",
   "scripts": {

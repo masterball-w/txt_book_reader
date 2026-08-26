@@ -1095,6 +1095,20 @@ function handleKeyDown(e) {
     return;
   }
 
+  // 墨域模式：A/D 键翻页（左手操作，右手握鼠标）
+  if (MODE === 'moyu') {
+    if (e.key === 'a' || e.key === 'A') {
+      e.preventDefault();
+      prevPage();
+      return;
+    }
+    if (e.key === 'd' || e.key === 'D') {
+      e.preventDefault();
+      nextPage();
+      return;
+    }
+  }
+
   switch (e.key) {
     case 'ArrowLeft':
     case 'PageUp':

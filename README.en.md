@@ -115,6 +115,8 @@ Installer: [`ShuReader-Setup-1.1.0-x64.exe`](https://github.com/masterball-w/txt
 |----------|--------|------|
 | `←` / `PageUp` | Previous page | All |
 | `→` / `PageDown` / `Space` | Next page | All |
+| `A` | Previous page (left-hand paging) | Ink Domain |
+| `D` | Next page (left-hand paging) | Ink Domain |
 | `Ctrl + B` | Bookmark | All |
 | `` Ctrl + ` `` | Show/hide Ink Domain window | Global |
 | `Ctrl + Shift + M` | Open Ink Domain mode | Global |

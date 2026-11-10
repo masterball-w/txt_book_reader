@@ -1,7 +1,7 @@
 {
   "name": "shu-reader",
-  "version": "1.5.1",
-  "description": "书库阅读器 - 支持全屏/窗口/墨域三种阅读模式",
+  "version": "1.6.0",
+  "description": "墨域 InkRealm - 桌面阅读器，支持全屏 / 窗口 / 墨域三种模式",
   "main": "main.js",
   "scripts": {
     "start": "node launch.js",
@@ -20,7 +20,7 @@
   },
   "build": {
     "appId": "com.doosho.shureader",
-    "productName": "书库阅读器",
+    "productName": "墨域",
     "copyright": "Copyright © 2024 shu-reader",
     "icon": "build/icon.ico",
     "directories": {
@@ -51,7 +51,7 @@
           ]
         }
       ],
-      "artifactName": "ShuReader-Setup-${version}-Full-x64.exe"
+      "artifactName": "InkRealm-Setup-${version}-Full-x64.exe"
     },
     "nsis": {
       "oneClick": false,
@@ -66,11 +66,11 @@
       "displayLanguageSelector": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "书库阅读器",
-      "uninstallDisplayName": "书库阅读器",
+      "shortcutName": "墨域",
+      "uninstallDisplayName": "墨域",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
-      "menuCategory": "书库阅读器",
+      "menuCategory": "墨域",
       "include": "build/installer.nsh",
       "warningsAsErrors": false
     },

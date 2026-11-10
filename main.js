@@ -7,6 +7,9 @@ const { createImportedStore, LOCAL_CATEGORY } = require('./lib/importedStore');
 const { buildLocalBookFilePath } = require('./lib/formats/imageMap');
 const { isImageLine } = require('./lib/formats/htmlToText');
 
+// 品牌更名为「墨域」后，用户数据目录继续沿用旧名，已放置的 shu/ 书库与阅读进度无需迁移
+app.setPath('userData', path.join(app.getPath('appData'), '书库阅读器'));
+
 // 必须在 app ready 前注册协议 scheme（privileged）
 protocol.registerSchemesAsPrivileged([
   {
@@ -311,7 +314,7 @@ function hideMainWindowToTray() {
     const iconPath = getAppIconPath();
     if (!iconPath) return;
     tray = new Tray(iconPath);
-    tray.setToolTip('书库阅读器 — 墨域阅读中，点击图标恢复主界面');
+    tray.setToolTip('墨域 — 阅读中，点击图标恢复主界面');
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: '显示主界面', click: () => restoreMainWindow() },
       { type: 'separator' },
@@ -340,7 +343,7 @@ function createMainWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    title: '书库阅读器',
+    title: '墨域',
     icon: getAppIconPath(),
     backgroundColor: '#1a1a2e',
     webPreferences: {

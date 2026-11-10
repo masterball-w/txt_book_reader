@@ -27,10 +27,10 @@ if (edition === 'lite') {
   config.extraResources = [
     { from: 'build/shu-lite', to: 'shu', filter: ['**/*'] }
   ];
-  config.win.artifactName = 'ShuReader-Setup-${version}-Lite-x64.exe';
+  config.win.artifactName = 'InkRealm-Setup-${version}-Lite-x64.exe';
 } else {
   config.extraResources = FULL_RESOURCES;
-  config.win.artifactName = 'ShuReader-Setup-${version}-Full-x64.exe';
+  config.win.artifactName = 'InkRealm-Setup-${version}-Full-x64.exe';
 }
 
 build({ win: ['nsis'], x64: true, config, publish: 'never' })

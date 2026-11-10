@@ -7,3 +7,6 @@ build/shu-lite/
 dist-release/
 ShuReader.exe
 
+# 参赛报名材料含个人信息，不入库
+docs/参赛报名已填内容备份.md
+
